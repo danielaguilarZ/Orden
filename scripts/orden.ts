@@ -32,7 +32,7 @@ const pidFile = path.join(dataDir, "orden.pid");
 const logDir = path.join(dataDir, "logs");
 const logFile = path.join(logDir, "orden.log");
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 fs.mkdirSync(logDir, { recursive: true });
 
