@@ -1,0 +1,40 @@
+{
+  "name": "orden",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Orden: asistente personal local con un equipo de agentes de Claude que viven en un living isométrico.",
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx scripts/orden.ts dev",
+    "build": "next build",
+    "start": "node --import tsx scripts/orden.ts start",
+    "worker": "node --import tsx worker/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "claude:login": "tsx scripts/claude-cli.ts login",
+    "claude:status": "tsx scripts/claude-cli.ts status",
+    "servicio:instalar": "node --import tsx scripts/servicio.ts instalar",
+    "servicio:quitar": "node --import tsx scripts/servicio.ts quitar",
+    "servicio:estado": "node --import tsx scripts/servicio.ts estado",
+    "servicio:arrancar": "node --import tsx scripts/servicio.ts arrancar",
+    "servicio:parar": "node --import tsx scripts/servicio.ts parar"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.287",
+    "fflate": "^0.8.3",
+    "next": "^16.3.8",
+    "pixi.js": "^8.22.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3"
+  }
+}

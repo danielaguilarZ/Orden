@@ -1,0 +1,28 @@
+# Dependencias y compilaciones
+node_modules/
+.next/
+.next-a/
+.next-b/
+next-env.d.ts
+*.tsbuildinfo
+
+# Datos locales: base de datos, archivos subidos, registros, clave de cifrado y copias de agentes
+data/
+exportaciones/
+*.db
+*.db-wal
+*.db-shm
+*.key
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+
+# Editor y sistema
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
