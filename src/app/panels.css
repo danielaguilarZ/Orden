@@ -1,0 +1,909 @@
+/* ───────────── Paneles (fase 3) ───────────── */
+
+@keyframes fresh {
+  0% {
+    background-color: rgba(232, 176, 74, 0.45);
+    transform: scale(0.97);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.fresh {
+  animation: fresh 1.4s ease-out both;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.row.end {
+  justify-content: flex-end;
+}
+.row > label {
+  flex: 1;
+}
+label.check {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px !important;
+  margin-top: 18px;
+}
+label.check input {
+  width: auto;
+}
+.icon-btn.small {
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--info);
+  box-shadow: 0 0 8px var(--info);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.inline-text {
+  cursor: text;
+  border-radius: 4px;
+}
+.inline-text:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.inline-text.empty {
+  color: var(--muted);
+}
+.inline-input {
+  padding: 2px 6px;
+  font-size: inherit;
+}
+
+.add-input input {
+  background: transparent;
+  border-style: dashed;
+  font-size: 13px;
+}
+
+/* Tablero */
+.board {
+  height: 100%;
+  overflow: auto;
+  padding: 18px 22px 40px;
+}
+
+.board-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.board-bar h1 {
+  margin: 0;
+  font-family: var(--font-pixel), monospace;
+  font-weight: 500;
+  font-size: 26px;
+}
+
+.board-empty {
+  margin: 80px auto;
+  max-width: 520px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  grid-auto-flow: dense;
+  gap: 16px;
+  align-items: start;
+}
+
+.board-cell.size-ancho {
+  grid-column: span 2;
+}
+.board-cell.size-grande {
+  grid-column: 1 / -1;
+}
+.board-cell.dragging {
+  opacity: 0.4;
+}
+.board-cell.drop-target .panel-card {
+  outline: 2px dashed var(--accent);
+}
+
+@media (max-width: 800px) {
+  .board-cell.size-ancho {
+    grid-column: auto;
+  }
+}
+
+.panel-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  overflow: hidden;
+  animation: fade-up 0.25s ease both;
+}
+
+.panel-card.busy {
+  border-color: rgba(107, 168, 239, 0.55);
+  box-shadow: 0 0 0 1px rgba(107, 168, 239, 0.2), 0 0 24px rgba(107, 168, 239, 0.12);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px 9px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+}
+
+.panel-head[draggable="true"] {
+  cursor: grab;
+}
+
+.panel-icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: rgba(232, 176, 74, 0.15);
+  color: var(--accent-2);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-weight: 700;
+  font-size: 14.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-meta {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.panel-actions .btn {
+  white-space: nowrap;
+}
+
+.panel-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.panel-body {
+  padding: 12px;
+  min-height: 80px;
+  max-height: 560px;
+  overflow: auto;
+}
+
+.size-grande .panel-body {
+  max-height: 760px;
+}
+
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.type-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.type-grid button span {
+  font-size: 20px;
+  color: var(--accent-2);
+}
+
+.type-grid button.on {
+  border-color: var(--accent);
+}
+
+.versions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.versions li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-2);
+}
+
+.versions small {
+  display: block;
+  color: var(--muted);
+}
+
+/* Panel en vivo en el living */
+.live-dock {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: min(520px, calc(100% - 280px));
+  max-height: calc(100% - 140px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: rgba(28, 26, 39, 0.96);
+  border: 1px solid rgba(107, 168, 239, 0.45);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  animation: fade-up 0.25s ease both;
+}
+
+.live-dock-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px 7px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.live-dock-bar .live-dot {
+  margin: 0 4px 0 0;
+}
+
+.live-dock .panel-card {
+  border: none;
+  border-radius: 0;
+  min-height: 0;
+}
+
+.live-dock .panel-body {
+  max-height: 420px;
+}
+
+/* Calendario */
+.cal-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+}
+
+.cal-label {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.cal-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cal-day {
+  min-height: 140px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cal.compact .cal-day {
+  min-height: 90px;
+}
+
+.cal-day.today {
+  outline: 1px solid var(--accent);
+}
+
+.cal-day header {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.cal-day header strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.cal-add {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+  opacity: 0;
+}
+
+.cal-day:hover .cal-add {
+  opacity: 1;
+}
+
+.cal-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cal-event {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  padding: 4px 6px;
+  border: none;
+  border-left: 3px solid var(--info);
+  border-radius: 5px;
+  background: rgba(57, 135, 229, 0.16);
+  color: var(--text);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cal-event.all-day {
+  border-left-color: var(--accent);
+  background: rgba(232, 176, 74, 0.16);
+}
+
+.cal-time {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-title {
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  max-width: 100%;
+}
+
+.cal-loc {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.cal-month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.cal-dow {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.cal-cell {
+  min-height: 74px;
+  padding: 4px;
+  border-radius: 6px;
+  background: var(--bg-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cal-cell.out {
+  opacity: 0.4;
+}
+.cal-cell.today {
+  outline: 1px solid var(--accent);
+}
+
+.cal-num {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cal-cell .cal-event {
+  flex-direction: row;
+  gap: 4px;
+  padding: 2px 4px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.cal-more {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.cal-agenda-day h4 {
+  margin: 10px 0 6px;
+  font-size: 13px;
+  text-transform: capitalize;
+  color: var(--muted);
+}
+
+.cal-agenda-day .cal-event {
+  flex-direction: row;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.skeleton {
+  min-height: 120px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--bg-2), var(--panel-2), var(--bg-2));
+  background-size: 200% 100%;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* Kanban */
+.kanban {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  align-items: flex-start;
+  padding-bottom: 4px;
+}
+
+.kb-col {
+  flex: 0 0 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--bg-2);
+}
+
+.kanban.compact .kb-col {
+  flex-basis: 170px;
+}
+
+.kb-col.over {
+  outline: 2px dashed var(--accent);
+}
+
+.kb-col header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.kb-count {
+  color: var(--muted);
+  font-size: 12px;
+  margin-right: auto;
+}
+
+.kb-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 10px;
+}
+
+.kb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  cursor: grab;
+  font-size: 13px;
+}
+
+.kb-card:hover {
+  border-color: var(--border);
+}
+
+.kb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+}
+
+.prio {
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-weight: 600;
+}
+.p-alta {
+  background: rgba(239, 107, 107, 0.2);
+  color: #f3a0a0;
+}
+.p-media {
+  background: rgba(240, 184, 74, 0.2);
+  color: var(--warn);
+}
+.p-baja {
+  background: rgba(92, 207, 138, 0.15);
+  color: var(--ok);
+}
+
+.due {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-new {
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
+/* Lista */
+.plist ul {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.plist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+}
+
+.plist li input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--ok);
+  flex-shrink: 0;
+}
+
+.plist-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.plist-text small {
+  color: var(--muted);
+}
+
+.plist li.done .inline-text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.progress {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--bg-2);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+  border-radius: 99px;
+  transition: width 0.3s;
+}
+
+/* Tabla */
+.ptable-scroll {
+  overflow: auto;
+}
+
+.ptable table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ptable th,
+.ptable td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ptable th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  position: relative;
+}
+
+.ptable .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ptable td {
+  cursor: text;
+  min-width: 70px;
+}
+
+.ptable td:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ptable td.editing {
+  padding: 2px;
+}
+
+.ptable td.editing input {
+  padding: 4px 6px;
+}
+
+.ptable tfoot td {
+  font-weight: 700;
+  border-bottom: none;
+  border-top: 2px solid var(--border);
+}
+
+.th-x {
+  margin-left: 4px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.ptable th:hover .th-x {
+  opacity: 1;
+}
+
+.row-x {
+  width: 30px;
+}
+
+.ptable-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ptable-actions select {
+  width: auto;
+}
+
+/* Notas */
+.pnotes {
+  position: relative;
+}
+
+.pnotes-edit {
+  position: absolute;
+  top: -4px;
+  right: 0;
+  opacity: 0;
+}
+
+.pnotes:hover .pnotes-edit {
+  opacity: 1;
+}
+
+.pnotes.editing textarea {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+/* Gráfico */
+.pchart .row {
+  margin-bottom: 8px;
+}
+
+.chart-wrap {
+  position: relative;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-svg .grid {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+}
+
+.chart-svg .baseline {
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 1;
+}
+
+.chart-svg .axis {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.chart-svg .pie-total {
+  fill: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.chart-tip {
+  position: absolute;
+  transform: translate(-50%, -110%);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(15, 14, 22, 0.95);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.chart-tip i,
+.chart-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+
+.chart-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chart-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+
+.chart-editor td,
+.chart-editor th {
+  padding: 2px;
+}
+
+.chart-editor input {
+  padding: 4px 6px;
+  font-size: 13px;
+}
+
+/* Hábitos */
+.habits table {
+  border-collapse: separate;
+  border-spacing: 3px;
+  font-size: 12px;
+}
+
+.habits thead th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11px;
+  text-align: center;
+  min-width: 24px;
+}
+
+.habits thead th span {
+  display: block;
+  font-size: 10px;
+}
+
+.habits thead th.today {
+  color: var(--accent-2);
+}
+
+.habit-name {
+  text-align: left;
+  padding-right: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.habit-name small {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.habit-cell {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--text);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.habit-cell.on {
+  background: var(--hc);
+  border-color: var(--hc);
+}
+
+.habit-cell.partial {
+  border-color: var(--hc);
+}
+
+.streak {
+  font-weight: 700;
+  padding-left: 6px;
+  white-space: nowrap;
+}
