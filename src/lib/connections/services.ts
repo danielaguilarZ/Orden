@@ -8,3 +8,4 @@ import "./weather";
 import "./rss";
 import "./telegram";
 import "./notion";
+import "./todoist";
