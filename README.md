@@ -45,7 +45,7 @@ También: `servicio:estado`, `servicio:parar`, `servicio:arrancar` y `servicio:q
 | Página | Para qué |
 | --- | --- |
 | **Living** | La casa. Escribe «Encárgale algo a Zen…», añade agentes y pulsa en cada uno para chatear, ver sus rutinas o editarlo. |
-| **Paneles** | Lo que crean los agentes (calendario, kanban, lista, tabla, notas, gráfico, hábitos). Edición a mano, historial, exportar (`.md`, `.csv`, `.xlsx`, `.ics`). Pestaña **Archivos** para tus documentos. |
+| **Paneles** | Tus listas, tableros, calendarios, tablas, notas, hábitos y gráficos. Créalos con una plantilla (un clic) o pídeselos a un agente; se editan a mano y cada uno tiene «Pedir cambios» y un menú «⋯» (exportar `.md`/`.csv`/`.xlsx`/`.ics`, historial, tamaño, papelera). Pestaña **Archivos** para tus documentos. |
 | **Memoria** | Tu perfil de vida (quién eres, objetivos, preferencias, personas…). La consultan y amplían todos los agentes. |
 | **Actividad** | Registro de encargos, rutinas, cambios y errores. |
 | **Conexiones** | Servicios externos opcionales (GitHub, Google Calendar en solo lectura) y el permiso de cada agente. No hay ninguna conectada de serie. |
