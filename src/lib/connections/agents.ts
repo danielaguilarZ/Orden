@@ -3,12 +3,7 @@ import { registerPromptSection } from "../agents/prompt";
 import { listAgents } from "../repo/agents";
 import { grantsForAgent, listConnections } from "../repo/connections";
 import { getService, type AgentGrant } from "./registry";
-import "./github";
-import "./google";
-import "./weather";
-import "./rss";
-import "./telegram";
-import "./notion";
+import "./services";
 
 /**
  * Conexiones para los agentes:

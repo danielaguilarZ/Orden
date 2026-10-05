@@ -1,11 +1,6 @@
 import { createConnection, getConnection, listConnections, publicConnection, updateConnection, type Connection, type PublicConnection } from "../repo/connections";
 import { getService, listServices, type OAuthState } from "./registry";
-import "./github";
-import "./google";
-import "./weather";
-import "./rss";
-import "./telegram";
-import "./notion";
+import "./services";
 
 /**
  * Conexiones: gestión (alta y configuración) y sincronización de los paneles
