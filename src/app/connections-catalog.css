@@ -94,3 +94,25 @@ button.conn-pick:hover {
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* Categorías: filtros y grupos del catálogo */
+.conn-cats {
+  margin-bottom: 8px;
+}
+.conn-group + .conn-group {
+  margin-top: 10px;
+}
+.conn-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.conn-group-title .muted {
+  font-weight: 400;
+}
