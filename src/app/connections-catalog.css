@@ -1,0 +1,67 @@
+/* Conexiones: catálogo para añadir, fichas «Próximamente» y pasos */
+
+.conn-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.conn-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+button.conn-pick {
+  cursor: pointer;
+}
+button.conn-pick:hover {
+  border-color: var(--accent);
+}
+.conn-pick.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.conn-pick small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.conn-pick .tag {
+  margin-top: auto;
+}
+.conn-pick.soon {
+  opacity: 0.6;
+  border-style: dashed;
+}
+.conn-plan {
+  font-style: italic;
+}
+.conn-add-form {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.conn-steps {
+  margin: 4px 0 10px;
+  font-size: 13px;
+}
+.conn-steps > summary {
+  cursor: pointer;
+  color: var(--accent-2);
+  font-weight: 600;
+}
+.conn-steps ol,
+.conn-steps-list {
+  margin: 6px 0 8px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}

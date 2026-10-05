@@ -5,6 +5,10 @@ import { grantsForAgent, listConnections } from "../repo/connections";
 import { getService, type AgentGrant } from "./registry";
 import "./github";
 import "./google";
+import "./weather";
+import "./rss";
+import "./telegram";
+import "./notion";
 
 /**
  * Conexiones para los agentes:

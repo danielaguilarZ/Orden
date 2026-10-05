@@ -3,10 +3,11 @@
 import { Backdrop } from "../Backdrop";
 import { useEffect, useState } from "react";
 import { api, useStore } from "@/client/store";
-import { PANEL_TYPES } from "@/lib/panels/types";
+import { TYPE_INFO, typeName } from "@/lib/panels/templates";
 import type { Panel, PanelVersion } from "@/lib/repo/panels";
 import { InlineText, usePanelOps } from "./common";
 import { formatsFor } from "@/lib/panels/export";
+import { MoreMenu } from "./MoreMenu";
 import { CalendarView } from "./CalendarView";
 import { KanbanView } from "./KanbanView";
 import { ListView } from "./ListView";
@@ -15,15 +16,7 @@ import { NotesView } from "./NotesView";
 import { ChartView } from "./ChartView";
 import { HabitsView } from "./HabitsView";
 
-export const PANEL_ICONS: Record<string, string> = {
-  calendario: "▦",
-  kanban: "▥",
-  lista: "☑",
-  tabla: "▤",
-  notas: "✎",
-  grafico: "▟",
-  habitos: "✓",
-};
+export const PANEL_ICONS: Record<string, string> = Object.fromEntries(Object.entries(TYPE_INFO).map(([k, v]) => [k, v.icon]));
 
 /** Vista del contenido según el tipo. Añadir un tipo = añadir su vista aquí. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -200,6 +193,7 @@ function ExportMenu({ panel, onClose }: { panel: Panel; onClose: () => void }) {
 }
 
 const SIZES: NonNullable<Panel["layout"]["size"]>[] = ["normal", "ancho", "grande"];
+const SIZE_LABEL: Record<NonNullable<Panel["layout"]["size"]>, string> = { normal: "normal", ancho: "ancho", alto: "alto", grande: "toda la fila" };
 
 export function PanelCard({
   panel,
@@ -217,6 +211,7 @@ export function PanelCard({
   const owner = agents.find((a) => a.id === panel.agentId);
   const busy = owner && owner.status === "working";
   const size = panel.layout.size ?? "normal";
+  const nextSize = SIZES[(SIZES.indexOf(size) + 1) % SIZES.length];
 
   return (
     <article className={`panel-card size-${size} ${busy ? "busy" : ""}`} data-type={panel.type}>
@@ -228,39 +223,30 @@ export function PanelCard({
           onSave={(title) => api(`/api/panels/${panel.id}`, { method: "PATCH", json: { title } })}
         />
         <span className="panel-meta">
-          {PANEL_TYPES[panel.type]?.label}
+          {typeName(panel.type)}
           {owner && ` · ${owner.name}`}
           {busy && <span className="live-dot" title={`${owner!.name} está trabajando`} />}
         </span>
         <div className="panel-actions">
-          <button className="btn ghost small" onClick={() => setModal("ask")} title="Pedir cambios a un agente">
+          <button className="btn ghost small" onClick={() => setModal("ask")} title="Pide a un agente que lo cambie por ti">
             Pedir cambios
           </button>
           {!compact && (
-            <>
-              <button className="icon-btn small" title="Exportar" onClick={() => setModal("export")}>
-                ⤓
-              </button>
-              <button className="icon-btn small" title="Historial" onClick={() => setModal("history")}>
-                ⟲
-              </button>
-              <button
-                className="icon-btn small"
-                title="Cambiar tamaño"
-                onClick={() =>
-                  api(`/api/panels/${panel.id}`, { method: "PATCH", json: { layout: { size: SIZES[(SIZES.indexOf(size) + 1) % SIZES.length] } } })
-                }
-              >
-                ⤢
-              </button>
-              <button
-                className="icon-btn small"
-                title="Archivar"
-                onClick={() => confirm(`¿Archivar «${panel.title}»? Podrás recuperarlo de la papelera.`) && api(`/api/panels/${panel.id}`, { method: "DELETE" })}
-              >
-                🗑
-              </button>
-            </>
+            <MoreMenu
+              items={[
+                { label: "Exportar o descargar…", onClick: () => setModal("export") },
+                { label: "Ver historial de cambios", onClick: () => setModal("history") },
+                {
+                  label: `Tamaño: ${SIZE_LABEL[size]} → ${SIZE_LABEL[nextSize]}`,
+                  onClick: () => api(`/api/panels/${panel.id}`, { method: "PATCH", json: { layout: { size: nextSize } } }),
+                },
+                {
+                  label: "Mover a la papelera",
+                  danger: true,
+                  onClick: () => confirm(`¿Mover «${panel.title}» a la papelera? Podrás recuperarlo.`) && api(`/api/panels/${panel.id}`, { method: "DELETE" }),
+                },
+              ]}
+            />
           )}
           {onExpand && (
             <button className="icon-btn small" title="Abrir en grande" onClick={onExpand}>

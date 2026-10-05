@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, onEvent, useStore } from "@/client/store";
 import type { OAuthState, ServiceInfo } from "@/lib/connections/registry";
+import { UPCOMING_SERVICES } from "@/lib/connections/catalog";
 import type { AuthMode, GrantLevel, PublicConnection } from "@/lib/repo/connections";
 import { useMounted } from "./panels/common";
 
@@ -57,7 +58,7 @@ export function ConnectionsPage() {
       {!data && !error && <p className="muted">Cargando…</p>}
       {data && (
         <>
-          {data.connections.length === 0 && <p className="muted">Todavía no hay conexiones.</p>}
+          {data.connections.length === 0 && <p className="muted">Todavía no hay conexiones. Elige una abajo: cada ficha explica cómo conectarla.</p>}
           {data.connections.map((c) => (
             <ConnectionCard key={c.id} conn={c} service={data.services.find((s) => s.key === c.service)} onChange={load} />
           ))}
@@ -132,6 +133,16 @@ function ConnectionCard({ conn, service, onChange }: { conn: ConnView; service?:
           Eliminar
         </button>
       </header>
+      {Boolean(service?.steps?.length) && (
+        <details className="conn-steps" open={Boolean(service?.supportsSecret && !conn.hasSecret)}>
+          <summary>Cómo conectarla</summary>
+          <ol>
+            {service!.steps!.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ol>
+        </details>
+      )}
 
       <div className="conn-grid">
         <div className="conn-block">
@@ -194,7 +205,7 @@ function ConnectionCard({ conn, service, onChange }: { conn: ConnView; service?:
             </>
           )}
 
-          {!oauth && (
+          {!oauth && conn.service === "github" && (
             <>
               <h3>Acceso</h3>
               <label className="conn-field">
@@ -212,7 +223,7 @@ function ConnectionCard({ conn, service, onChange }: { conn: ConnView; service?:
           {service?.supportsSecret && (
             <>
               <div className="conn-field">
-                <span>Token</span>
+                <span>{service.secretLabel ?? "Token"}</span>
                 {conn.hasSecret ? (
                   <span className="conn-token">
                     <span className="tag gold">Guardado (cifrado) {conn.secretHint}</span>
@@ -232,9 +243,15 @@ function ConnectionCard({ conn, service, onChange }: { conn: ConnView; service?:
                   patch({ token }).then(() => setToken(""));
                 }}
               >
-                <input type="password" autoComplete="off" value={token} placeholder={conn.hasSecret ? "Sustituir token…" : "github_pat_…"} onChange={(e) => setToken(e.target.value)} />
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={token}
+                  placeholder={conn.hasSecret ? "Sustituir…" : (service.secretPlaceholder ?? "github_pat_…")}
+                  onChange={(e) => setToken(e.target.value)}
+                />
                 <button className="btn small" disabled={!token.trim()}>
-                  Guardar token
+                  Guardar (cifrado)
                 </button>
               </form>
               {conn.service === "github" && (
@@ -320,42 +337,73 @@ function ConnectionCard({ conn, service, onChange }: { conn: ConnView; service?:
   );
 }
 
+/** Catálogo: las disponibles se eligen y se añaden; las que vendrán muestran su ficha. */
 function AddConnection({ services, onAdded }: { services: ServiceInfo[]; onAdded: () => void }) {
-  const [service, setService] = useState(services[0]?.key ?? "");
+  const [service, setService] = useState("");
   const [config, setConfig] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const s = services.find((x) => x.key === service);
-  if (!s) return null;
   return (
-    <form
-      className="conn-card conn-add"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setError("");
-        try {
-          await api("/api/connections", { method: "POST", json: { service, config } });
-          setConfig({});
-          onAdded();
-        } catch (err) {
-          setError((err as Error).message);
-        }
-      }}
-    >
+    <section className="conn-card conn-add">
       <h3>Añadir conexión</h3>
-      <div className="conn-row">
-        <select value={service} onChange={(e) => setService(e.target.value)}>
-          {services.map((x) => (
-            <option key={x.key} value={x.key}>
-              {x.label}
-            </option>
-          ))}
-        </select>
-        {s.fields.map((f) => (
-          <input key={f.key} value={config[f.key] ?? ""} placeholder={f.placeholder ?? f.label} onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })} />
+      <div className="conn-catalog">
+        {services.map((x) => (
+          <button
+            key={x.key}
+            type="button"
+            className={`conn-pick ${service === x.key ? "on" : ""}`}
+            onClick={() => {
+              setService(service === x.key ? "" : x.key);
+              setConfig({});
+              setError("");
+            }}
+          >
+            <strong>{x.label}</strong>
+            <small>{x.description}</small>
+            <span className="tag">{x.readOnly ? "Solo lectura" : x.authKind === "oauth" ? "OAuth" : x.supportsSecret ? "Token cifrado" : "Sin credenciales"}</span>
+          </button>
         ))}
-        <button className="btn small primary">Añadir</button>
+        {UPCOMING_SERVICES.map((x) => (
+          <div key={x.key} className="conn-pick soon" title={x.plan}>
+            <strong>{x.label}</strong>
+            <small>{x.description}</small>
+            <small className="conn-plan">{x.plan}</small>
+            <span className="tag">Próximamente</span>
+          </div>
+        ))}
       </div>
-      {error && <p className="bad-text small">{error}</p>}
-    </form>
+      {s && (
+        <form
+          className="conn-add-form"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            try {
+              await api("/api/connections", { method: "POST", json: { service, config } });
+              setConfig({});
+              setService("");
+              onAdded();
+            } catch (err) {
+              setError((err as Error).message);
+            }
+          }}
+        >
+          {Boolean(s.steps?.length) && (
+            <ol className="conn-steps-list">
+              {s.steps!.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          )}
+          <div className="conn-row">
+            {s.fields.map((f) => (
+              <input key={f.key} aria-label={f.label} value={config[f.key] ?? ""} placeholder={f.placeholder ?? f.label} onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })} />
+            ))}
+            <button className="btn small primary">Añadir {s.label}</button>
+          </div>
+          {error && <p className="bad-text small">{error}</p>}
+        </form>
+      )}
+    </section>
   );
 }
