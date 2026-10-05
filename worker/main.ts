@@ -14,7 +14,7 @@ import { tickRoutines } from "../src/lib/routines/runner";
 import { refreshUsage } from "../src/lib/claude/usage";
 import { syncDueConnections } from "../src/lib/connections";
 import { ensureFilesSeed } from "../src/lib/files/repo";
-import { dispatchAccepted } from "../src/lib/proposals/repo";
+import { dispatchAnswered } from "../src/lib/decisions/repo";
 
 const HEARTBEAT_MS = 10_000;
 const TICK_MS = 400;
@@ -99,11 +99,11 @@ function main() {
     } catch (err) {
       log("Error en las rutinas:", err);
     }
-    // Propuestas aceptadas que aún no han llegado a Zen (la web ya avisa al aceptar; esto es la red).
+    // Respuestas a decisiones que aún no han llegado a su agente (la web ya avisa al responder; esto es la red).
     try {
-      for (const p of dispatchAccepted()) log(`✅ Propuesta aceptada para Zen: ${p.title.slice(0, 60)}`);
+      for (const d of dispatchAnswered()) log(`✅ Respuesta enviada: ${d.title.slice(0, 60)}`);
     } catch (err) {
-      log("Error en las propuestas:", err);
+      log("Error en las decisiones:", err);
     }
   };
   routines();

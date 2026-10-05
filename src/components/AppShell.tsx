@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { connect, hydrate, refreshClaude, useStore } from "@/client/store";
 import type { Snapshot } from "@/lib/server";
-import { TAB_LABEL } from "@/lib/proposals/labels";
+import { TAB_LABEL } from "@/lib/decisions/labels";
 import { ConnectClaudeDialog } from "./ConnectClaudeDialog";
 
 const NAV = [
@@ -13,8 +13,8 @@ const NAV = [
   { key: "memoria", href: "/memoria", label: "Memoria" },
   { key: "actividad", href: "/actividad", label: "Actividad" },
   { key: "conexiones", href: "/conexiones", label: "Conexiones" },
-  // Pestaña «Acción humana» (antes «Propuestas»): misma ruta para no romper enlaces.
-  { key: "propuestas", href: "/propuestas", label: TAB_LABEL },
+  // «Decisiones» (antes «Propuestas» / «Acción humana»; /propuestas redirige aquí).
+  { key: "decisiones", href: "/decisiones", label: TAB_LABEL },
 ];
 
 export function AppShell({ initial, active, children }: { initial: Snapshot; active: string; children: React.ReactNode }) {
@@ -41,7 +41,7 @@ export function AppShell({ initial, active, children }: { initial: Snapshot; act
           {NAV.map((n) => (
             <Link key={n.key} href={n.href} className={n.key === active ? "active" : ""}>
               {n.label}
-              {n.key === "propuestas" && <PendingBadge />}
+              {n.key === "decisiones" && <PendingBadge />}
             </Link>
           ))}
         </nav>
@@ -56,12 +56,12 @@ export function AppShell({ initial, active, children }: { initial: Snapshot; act
   );
 }
 
-/** Número de propuestas por decidir junto a la pestaña. */
+/** Número de decisiones pendientes junto a la pestaña. */
 function PendingBadge() {
-  const n = useStore((s) => s.proposalsPending);
+  const n = useStore((s) => s.decisionsPending);
   if (!n) return null;
   return (
-    <span className="nav-badge" title={`${n} propuesta${n === 1 ? "" : "s"} por decidir`}>
+    <span className="nav-badge" title={`${n} decisi${n === 1 ? "ón pendiente" : "ones pendientes"}`}>
       {n}
     </span>
   );
