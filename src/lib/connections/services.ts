@@ -9,3 +9,4 @@ import "./rss";
 import "./telegram";
 import "./notion";
 import "./todoist";
+import "./trello";
