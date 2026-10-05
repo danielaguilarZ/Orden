@@ -72,10 +72,13 @@ export function secretHint(plain: string): string {
 export function redact(text: string, ...secrets: (string | null | undefined)[]): string {
   let out = text;
   for (const s of secrets) if (s && s.length >= 6) out = out.split(s).join("***");
-  // Por si acaso: formatos conocidos de tokens de GitHub y de Google (acceso, renovación y secreto de cliente).
+  // Por si acaso: formatos conocidos de tokens de GitHub, Google (acceso, renovación y secreto de cliente),
+  // bots de Telegram e integraciones de Notion.
   return out
     .replace(/\b(gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, "***")
     .replace(/\bya29\.[A-Za-z0-9._-]{20,}/g, "***")
     .replace(/(^|[^A-Za-z0-9])1\/\/[A-Za-z0-9._-]{20,}/g, "$1***")
-    .replace(/\bGOCSPX-[A-Za-z0-9_-]{10,}/g, "***");
+    .replace(/\bGOCSPX-[A-Za-z0-9_-]{10,}/g, "***")
+    .replace(/\b\d{6,12}:[A-Za-z0-9_-]{30,}/g, "***")
+    .replace(/\b(secret_|ntn_)[A-Za-z0-9]{30,}/g, "***");
 }

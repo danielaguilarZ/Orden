@@ -48,8 +48,24 @@ También: `servicio:estado`, `servicio:parar`, `servicio:arrancar` y `servicio:q
 | **Paneles** | Lo que crean los agentes (calendario, kanban, lista, tabla, notas, gráfico, hábitos). Edición a mano, historial, exportar (`.md`, `.csv`, `.xlsx`, `.ics`). Pestaña **Archivos** para tus documentos. |
 | **Memoria** | Tu perfil de vida (quién eres, objetivos, preferencias, personas…). La consultan y amplían todos los agentes. |
 | **Actividad** | Registro de encargos, rutinas, cambios y errores. |
-| **Conexiones** | Servicios externos opcionales (GitHub, Google Calendar en solo lectura) y el permiso de cada agente. No hay ninguna conectada de serie. |
+| **Conexiones** | Servicios externos opcionales y el permiso de cada agente (lectura o completo). No hay ninguna conectada de serie. Ver abajo. |
 | **Acción humana** | Propuestas del equipo para aceptar, rechazar o aplazar, y lo que necesitan de ti. |
+
+### Conexiones disponibles
+
+| Servicio | Qué permite | Credencial |
+| --- | --- | --- |
+| GitHub | Leer y comentar; con permiso completo, ramas, commits y PRs (nunca fusiona). | `gh` del PC o token fine-grained cifrado |
+| Google Calendar | Leer la agenda y volcarla a un panel. Solo lectura. | OAuth en el navegador (calendar.readonly) |
+| Tiempo (clima) | Tiempo actual y previsión hasta 7 días (Open-Meteo). Solo lectura. | Ninguna |
+| Noticias (RSS) | Titulares de las fuentes RSS/Atom que elijas (máx. 15). Solo lectura. | Ninguna |
+| Telegram (avisos) | Con permiso completo, avisos de texto a tu chat: máx. 1000 caracteres y 20 al día. | Token del bot, cifrado |
+| Notion | Buscar y leer las páginas que compartas con la integración; con permiso completo, añadir texto al final (nunca borra). | Secreto de integración, cifrado |
+
+Cada ficha explica **cómo conectarla paso a paso**. Las credenciales se guardan cifradas (AES-256-GCM) y nunca
+se muestran enteras ni aparecen en mensajes de error. Próximamente (con ficha en la pestaña): Tareas (Todoist),
+Google Drive/Docs, Gmail (lectura y borradores), Outlook/Microsoft 365, correo IMAP, Home Assistant, bancos
+(CSV/Open Banking), WhatsApp y Spotify.
 
 Ejemplos de encargos para Zen:
 
