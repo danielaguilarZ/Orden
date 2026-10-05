@@ -5,7 +5,9 @@ import { api, onEvent } from "@/client/store";
 import type { Agent } from "@/lib/types";
 import type { Routine } from "@/lib/repo/routines";
 import { describeSchedule, ROUTINE_TEMPLATES, type Schedule } from "@/lib/routines/schedule";
+import { whenLabel } from "@/lib/ui/text";
 import { useMounted } from "./panels/common";
+import { Card, Chip, EmptyState, SectionHeader } from "./ui/kit";
 
 const DAYS = ["L", "M", "X", "J", "V", "S", "D"];
 
@@ -152,13 +154,13 @@ function RoutineForm({ agent, draft, onClose }: { agent: Agent; draft: Draft; on
   );
 }
 
-const fmtDate = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+const fmtDate = (iso: string | null) => (iso ? whenLabel(iso) : "—");
 
 export function RoutinesTab({ agent }: { agent: Agent }) {
   const [routines, setRoutines] = useState<Routine[] | null>(null);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [error, setError] = useState("");
+  const [openId, setOpenId] = useState("");
   const mounted = useMounted();
 
   const load = useCallback(() => api<Routine[]>(`/api/routines?agentId=${agent.id}`).then(setRoutines), [agent.id]);
@@ -175,57 +177,75 @@ export function RoutinesTab({ agent }: { agent: Agent }) {
         <RoutineForm agent={agent} draft={editing} onClose={() => setEditing(null)} />
       ) : (
         <>
-          <div className="row" style={{ padding: "12px 16px 0" }}>
-            <span className="muted small" style={{ flex: 1 }}>
-              Tareas que {agent.name} hace por su cuenta, sin que se lo pidas. Las ejecuta el worker.
-            </span>
-            <button className="btn primary small" onClick={() => setEditing({ name: "", prompt: "", schedule: { tipo: "diaria", hora: "08:00" } })}>
-              + Rutina
-            </button>
+          <div className="routines-head">
+            <SectionHeader
+              icon="🔁"
+              title="Rutinas"
+              count={routines?.length}
+              hint={`Lo que ${agent.name} hace solo`}
+              actions={
+                <button className="btn primary small" onClick={() => setEditing({ name: "", prompt: "", schedule: { tipo: "diaria", hora: "08:00" } })}>
+                  + Rutina
+                </button>
+              }
+            />
           </div>
-          <ul className="routine-list">
-            {routines?.length === 0 && <li className="muted">Sin rutinas todavía.</li>}
-            {routines?.map((r) => (
-              <li key={r.id} className={r.enabled ? "" : "off"}>
-                <div className="routine-main">
-                  <strong>{r.name}</strong>
-                  <span className="muted small">
-                    {describeSchedule(r.schedule)}
-                    {mounted && r.enabled && ` · próxima: ${fmtDate(r.nextRunAt)}`}
-                    {mounted && r.lastRunAt && ` · última: ${fmtDate(r.lastRunAt)}`}
-                  </span>
-                  <p>{r.prompt}</p>
-                </div>
-                <div className="routine-actions">
-                  <label className="switch" title={r.enabled ? "Pausar" : "Activar"}>
-                    <input type="checkbox" checked={r.enabled} onChange={() => api(`/api/routines/${r.id}`, { method: "PATCH", json: { enabled: !r.enabled } })} />
-                    <span />
-                  </label>
-                  <button
-                    className="btn ghost small"
-                    onClick={() => api(`/api/routines/${r.id}/run`, { method: "POST" }).catch((e) => setError(e.message))}
-                  >
-                    Ejecutar ahora
-                  </button>
-                  <button className="icon-btn small" title="Editar" onClick={() => setEditing({ id: r.id, name: r.name, prompt: r.prompt, schedule: r.schedule })}>
-                    ✎
-                  </button>
-                  <button className="icon-btn small" title="Eliminar" onClick={() => confirm(`¿Eliminar «${r.name}»?`) && api(`/api/routines/${r.id}`, { method: "DELETE" })}>
-                    ×
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {routines?.length === 0 && (
+            <EmptyState icon="⏰" title="Sin rutinas todavía">
+              Programa algo que {agent.name} haga por su cuenta: un resumen cada mañana, un repaso semanal…
+            </EmptyState>
+          )}
+          <div className="ui-stack routine-cards">
+            {routines?.map((r) => {
+              const open = openId === r.id;
+              return (
+                <Card
+                  key={r.id}
+                  tone={r.enabled ? undefined : "off"}
+                  title={r.name}
+                  summary={describeSchedule(r.schedule)}
+                  open={open}
+                  onToggle={() => setOpenId(open ? "" : r.id)}
+                  chips={!r.enabled ? <Chip>Pausada</Chip> : open ? <Chip icon="🕒">{describeSchedule(r.schedule)}</Chip> : undefined}
+                  meta={mounted && r.enabled && r.nextRunAt ? `próxima: ${fmtDate(r.nextRunAt)}` : undefined}
+                  side={
+                    <label className="switch" title={r.enabled ? "Pausar" : "Activar"}>
+                      <input type="checkbox" checked={r.enabled} onChange={() => api(`/api/routines/${r.id}`, { method: "PATCH", json: { enabled: !r.enabled } })} />
+                      <span />
+                    </label>
+                  }
+                  actions={
+                    <>
+                      <button className="btn small" onClick={() => api(`/api/routines/${r.id}/run`, { method: "POST" }).catch((e) => setError(e.message))}>
+                        ▶ Ejecutar ahora
+                      </button>
+                      <button className="btn small ghost" onClick={() => setEditing({ id: r.id, name: r.name, prompt: r.prompt, schedule: r.schedule })}>
+                        ✎ Editar
+                      </button>
+                      <span style={{ flex: 1 }} />
+                      <button className="btn small ghost" onClick={() => confirm(`¿Eliminar «${r.name}»?`) && api(`/api/routines/${r.id}`, { method: "DELETE" })}>
+                        Eliminar
+                      </button>
+                    </>
+                  }
+                >
+                  <p className="ui-detail">{r.prompt}</p>
+                  {mounted && <p className="ui-facts">Última ejecución: {fmtDate(r.lastRunAt)}</p>}
+                </Card>
+              );
+            })}
+          </div>
           {error && <p className="bad-text small" style={{ padding: "0 16px" }}>{error}</p>}
           {templates.length > 0 && (
             <div className="templates">
-              <span className="muted small">Ideas rápidas:</span>
-              {templates.map((t) => (
-                <button key={t.name} className="chip" onClick={() => setEditing({ name: t.name, prompt: t.prompt, schedule: t.schedule })}>
-                  {t.name} · {describeSchedule(t.schedule)}
-                </button>
-              ))}
+              <span className="muted small">Ideas rápidas</span>
+              <div className="ui-filters">
+                {templates.map((t) => (
+                  <button key={t.name} className="ui-filter" title={`${t.prompt} (${describeSchedule(t.schedule)})`} onClick={() => setEditing({ name: t.name, prompt: t.prompt, schedule: t.schedule })}>
+                    + {t.name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </>

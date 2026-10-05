@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Agent } from "@/lib/types";
 import { getPersonality } from "@/lib/personalities";
 import { api, useStore } from "@/client/store";
+import { hasMore, plural, summarize } from "@/lib/ui/text";
 import { AvatarPreview } from "./AvatarPreview";
 import { AgentChat } from "./AgentChat";
 import { AgentForm } from "./AgentForm";
@@ -24,6 +25,7 @@ const MODEL: Record<string, string> = { haiku: "Haiku", sonnet: "Sonnet", opus: 
 export function AgentDrawer({ agent, onClose }: { agent: Agent; onClose: () => void }) {
   const [tab, setTab] = useState<"chat" | "rutinas" | "ficha">("chat");
   const [editing, setEditing] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
   const status = agent.paused ? "sleeping" : agent.status;
   const personality = getPersonality(agent.personality.preset);
   const rooms = useStore((s) => s.rooms);
@@ -86,17 +88,34 @@ export function AgentDrawer({ agent, onClose }: { agent: Agent; onClose: () => v
             {agent.instructions && (
               <>
                 <dt>Instrucciones</dt>
-                <dd className="pre">{agent.instructions}</dd>
+                <dd className={showInstructions ? "pre" : ""}>
+                  {showInstructions || !hasMore(agent.instructions, 140) ? agent.instructions : summarize(agent.instructions, 140)}
+                  {hasMore(agent.instructions, 140) && (
+                    <>
+                      {" "}
+                      <button className="ui-link" onClick={() => setShowInstructions((v) => !v)}>
+                        {showInstructions ? "Ocultar" : "Ver todas"}
+                      </button>
+                    </>
+                  )}
+                </dd>
               </>
             )}
-            <dt>Frases de ambiente</dt>
-            <dd>
-              <ul className="phrases">
-                {agent.ambient.slice(0, 8).map((p) => (
-                  <li key={p}>«{p}»</li>
-                ))}
-              </ul>
-            </dd>
+            {agent.ambient.length > 0 && (
+              <>
+                <dt>Frases</dt>
+                <dd>
+                  <details className="ui-fold">
+                    <summary>{plural(Math.min(agent.ambient.length, 8), "frase de ambiente", "frases de ambiente")}</summary>
+                    <ul className="phrases">
+                      {agent.ambient.slice(0, 8).map((p) => (
+                        <li key={p}>«{p}»</li>
+                      ))}
+                    </ul>
+                  </details>
+                </dd>
+              </>
+            )}
           </dl>
           <RoomSection agent={agent} />
           <div className="drawer-actions">

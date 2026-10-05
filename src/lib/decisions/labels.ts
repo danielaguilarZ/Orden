@@ -90,3 +90,36 @@ export function answerLabel(d: Decision): string {
       return d.status === "pendiente" ? "Pendiente" : "Resuelta";
   }
 }
+
+/** Qué se le pide al usuario, en dos palabras (chip de la tarjeta). */
+export function decisionKind(d: Pick<Decision, "approval" | "options">): { icon: string; label: string } {
+  if (d.approval) return { icon: "✓", label: "Sí / No" };
+  if (d.options.length) return { icon: "☰", label: `Elegir (${d.options.length})` };
+  return { icon: "✎", label: "Respuesta" };
+}
+
+/** Resultado en dos partes para el histórico: estado corto (chip) y la respuesta, si la hay. */
+export function answerParts(d: Pick<Decision, "answerKind" | "answer" | "status">): { state: string; detail: string } {
+  const detail = d.answer?.trim() ?? "";
+  switch (d.answerKind) {
+    case "aceptar":
+      return { state: "Aceptada", detail };
+    case "rechazar":
+      return { state: "Rechazada", detail };
+    case "opcion":
+      return { state: "Elegida", detail };
+    case "texto":
+      return { state: "Respondida", detail };
+    case "retirada":
+      return { state: "Retirada", detail: "" };
+    default:
+      return { state: d.status === "pendiente" ? "Pendiente" : "Resuelta", detail: "" };
+  }
+}
+
+/** Color del resultado en el histórico. */
+export function answerTone(kind: AnswerKind | null): "ok" | "bad" | "off" {
+  if (kind === "rechazar") return "bad";
+  if (kind === "retirada" || !kind) return "off";
+  return "ok";
+}
