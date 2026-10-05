@@ -1,13 +1,6 @@
-import { AppShell } from "@/components/AppShell";
-import { ProposalsPage } from "@/components/ProposalsPage";
-import { snapshot } from "@/lib/server";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
+/** La antigua pestaña «Propuestas» / «Acción humana» ahora es «Decisiones». */
 export default function PropuestasPage() {
-  return (
-    <AppShell initial={snapshot()} active="propuestas">
-      <ProposalsPage />
-    </AppShell>
-  );
+  redirect("/decisiones");
 }
