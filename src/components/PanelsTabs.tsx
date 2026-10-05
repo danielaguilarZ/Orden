@@ -5,7 +5,7 @@ export function PanelsTabs({ active }: { active: "tablero" | "archivos" }) {
   return (
     <nav className="subtabs">
       <Link href="/paneles" className={active === "tablero" ? "on" : ""}>
-        Tablero
+        Mis paneles
       </Link>
       <Link href="/paneles/archivos" className={active === "archivos" ? "on" : ""}>
         Archivos
