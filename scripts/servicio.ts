@@ -15,9 +15,15 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadEnv } from "../src/lib/env";
+
+loadEnv();
 
 const TASK = "Orden";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// Mismo puerto que el supervisor (scripts/orden.ts): PORT del entorno o .env, si no 3000.
+const PORT = Number(process.env.PORT) || 3000;
+const URL_WEB = `http://localhost:${PORT}`;
 const node = process.execPath;
 const conhost = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "conhost.exe");
 
@@ -48,7 +54,7 @@ $watch = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -Repetition
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable \`
   -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\\$env:USERNAME" -LogonType Interactive -RunLevel Limited
-Register-ScheduledTask -TaskName ${q(TASK)} -Description 'Orden: asistente personal con agentes (web en http://localhost:3000)' \`
+Register-ScheduledTask -TaskName ${q(TASK)} -Description 'Orden: asistente personal con agentes (web en ${URL_WEB})' \`
   -Action $action -Trigger @($logon, $watch) -Settings $settings -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName ${q(TASK)}
 `;
@@ -58,7 +64,7 @@ Start-ScheduledTask -TaskName ${q(TASK)}
     process.exit(1);
   }
   console.log("✔ Orden instalado: arrancará solo al iniciar sesión y se relanzará si se cae.");
-  console.log("  Ya se está iniciando en segundo plano. Ábrelo en http://localhost:3000 (la primera vez puede tardar si tiene que compilar).");
+  console.log(`  Ya se está iniciando en segundo plano. Ábrelo en ${URL_WEB} (la primera vez puede tardar si tiene que compilar).`);
   console.log(`  Registro: ${path.join(root, "data", "logs", "orden.log")}`);
 }
 
@@ -91,7 +97,7 @@ function parar() {
 
 function arrancar() {
   const r = ps(`Start-ScheduledTask -TaskName ${q(TASK)}`);
-  console.log(r.ok ? "✔ Iniciando Orden en segundo plano (http://localhost:3000)." : `No está instalado como servicio. Usa npm run servicio:instalar.\n${r.out}`);
+  console.log(r.ok ? `✔ Iniciando Orden en segundo plano (${URL_WEB}).` : `No está instalado como servicio. Usa npm run servicio:instalar.\n${r.out}`);
 }
 
 async function estado() {
@@ -104,8 +110,8 @@ async function estado() {
   const pid = supervisorPid();
   console.log(pid ? `Supervisor: en marcha (proceso ${pid})` : "Supervisor: parado");
   try {
-    const res = await fetch("http://127.0.0.1:3000/api/claude/usage", { signal: AbortSignal.timeout(5000) });
-    console.log(`Web: responde (HTTP ${res.status}) en http://localhost:3000`);
+    const res = await fetch(`http://127.0.0.1:${PORT}/api/claude/usage`, { signal: AbortSignal.timeout(5000) });
+    console.log(`Web: responde (HTTP ${res.status}) en ${URL_WEB}`);
   } catch {
     console.log("Web: no responde");
   }
