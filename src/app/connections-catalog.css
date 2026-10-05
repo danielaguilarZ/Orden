@@ -1,23 +1,60 @@
-/* Conexiones: catálogo para añadir, fichas «Próximamente» y pasos */
+/* Conexiones: catálogo compacto con buscador, fichas «Próximamente» y pasos */
 
+.conn-add-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.conn-add-bar .conn-section {
+  margin: 0;
+}
+.conn-filters {
+  display: flex;
+  gap: 4px;
+}
+.conn-search {
+  width: 180px;
+  padding: 4px 9px;
+  font-size: 13px;
+}
 .conn-catalog {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 10px;
-  margin-top: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
 }
 .conn-pick {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 12px;
-  border-radius: 10px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: center;
+  padding: 7px 9px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-2);
   color: var(--text);
   font: inherit;
+  font-size: 13px;
   text-align: left;
+}
+.conn-pick-icon {
+  grid-row: span 2;
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+.conn-pick strong {
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.conn-pick .tag {
+  justify-self: start;
+  font-size: 10px;
 }
 button.conn-pick {
   cursor: pointer;
@@ -29,28 +66,21 @@ button.conn-pick:hover {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
 }
-.conn-pick small {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
-}
-.conn-pick .tag {
-  margin-top: auto;
-}
 .conn-pick.soon {
-  opacity: 0.6;
+  opacity: 0.55;
   border-style: dashed;
-}
-.conn-plan {
-  font-style: italic;
+  cursor: help;
 }
 .conn-add-form {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  margin-top: 10px;
+  padding: 4px 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  animation: fade-up 0.15s ease both;
 }
 .conn-steps {
-  margin: 4px 0 10px;
+  margin: 6px 0;
   font-size: 13px;
 }
 .conn-steps > summary {
@@ -58,8 +88,7 @@ button.conn-pick:hover {
   color: var(--accent-2);
   font-weight: 600;
 }
-.conn-steps ol,
-.conn-steps-list {
+.conn-steps ol {
   margin: 6px 0 8px;
   padding-left: 20px;
   font-size: 13px;
