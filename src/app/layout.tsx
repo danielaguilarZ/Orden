@@ -7,7 +7,7 @@ import "./memory.css";
 import "./routines.css";
 import "./connections.css";
 import "./files.css";
-import "./proposals.css";
+import "./decisions.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
 const pixel = Pixelify_Sans({ subsets: ["latin"], variable: "--font-pixel" });
