@@ -27,6 +27,11 @@ export interface ServiceInfo {
   authKind?: "token" | "oauth";
   /** Solo lectura: no se puede dar permiso «completo». */
   readOnly?: boolean;
+  /** Cómo conectarla, paso a paso (se muestra en la ficha). */
+  steps?: string[];
+  /** Nombre y ejemplo de la credencial (si usa token). */
+  secretLabel?: string;
+  secretPlaceholder?: string;
 }
 
 /** Estado OAuth que ve la interfaz (sin secretos). */
@@ -81,5 +86,8 @@ export function serviceInfo(s: ConnectionService): ServiceInfo {
     supportsSecret: s.supportsSecret,
     authKind: s.authKind ?? "token",
     readOnly: Boolean(s.readOnly),
+    steps: s.steps ?? [],
+    secretLabel: s.secretLabel,
+    secretPlaceholder: s.secretPlaceholder,
   };
 }
