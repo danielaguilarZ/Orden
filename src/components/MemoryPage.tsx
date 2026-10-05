@@ -4,8 +4,11 @@ import { Backdrop } from "./Backdrop";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, onEvent, useStore } from "@/client/store";
 import { MEMORY_CATEGORIES } from "@/lib/memory/categories";
+import { countByCategory, filterMemory, groupMemory, memoryCategories, type CategoryInfo } from "@/lib/memory/view";
+import { plural, relativeDate, summarize } from "@/lib/ui/text";
 import type { MemoryEntry, MemoryVersion } from "@/lib/repo/memory";
 import { useFresh } from "./panels/common";
+import { Card, Chip, EmptyState, FilterChips, PageHeader, SearchBox, Section, Toolbar, useToggleSet } from "./ui/kit";
 
 type Draft = { id?: string; category: string; title: string; content: string; tags: string };
 
@@ -114,13 +117,21 @@ function History({ entry, onClose }: { entry: MemoryEntry; onClose: () => void }
   );
 }
 
+const blank = (category = "quien_soy"): Draft => ({ category, title: "", content: "", tags: "" });
+
+/**
+ * Pestaña «Memoria»: recuerdos como tarjetas cortas agrupadas por categoría
+ * (plegables), con buscador y filtro. El detalle completo se abre al pulsar.
+ */
 export function MemoryPage() {
   const [entries, setEntries] = useState<MemoryEntry[] | null>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<MemoryEntry[] | null>(null);
+  const [category, setCategory] = useState("");
   const [trash, setTrash] = useState(false);
+  const [openId, setOpenId] = useState("");
   const [editing, setEditing] = useState<Draft | null>(null);
   const [history, setHistory] = useState<MemoryEntry | null>(null);
+  const [folded, toggleFold] = useToggleSet("orden.memoria.plegadas");
   const agents = useStore((s) => s.agents);
   const fresh = useFresh((entries ?? []).map((e) => `${e.id}:${e.version}`));
 
@@ -134,106 +145,207 @@ export function MemoryPage() {
 
   useEffect(() => onEvent((e) => e.type.startsWith("memory.") && load()), [load]);
 
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults(null);
-      return;
-    }
-    const t = setTimeout(() => api<MemoryEntry[]>(`/api/memory?q=${encodeURIComponent(query)}`).then(setResults), 250);
-    return () => clearTimeout(t);
-  }, [query, entries]);
-
-  const shown = results ?? entries ?? [];
-  const byCat = useMemo(() => {
-    const m = new Map<string, MemoryEntry[]>();
-    for (const e of shown) m.set(e.category, [...(m.get(e.category) ?? []), e]);
-    return m;
-  }, [shown]);
-  const cats = [...MEMORY_CATEGORIES, ...[...byCat.keys()].filter((k) => !MEMORY_CATEGORIES.some((c) => c.key === k)).map((k) => ({ key: k, label: k, hint: "" }))];
-  const who = (by: string) => (by === "user" ? "tú" : (agents.find((a) => a.id === by)?.name ?? "un agente"));
+  const all = useMemo(() => entries ?? [], [entries]);
+  const cats = useMemo(() => memoryCategories(all), [all]);
+  const counts = useMemo(() => countByCategory(all), [all]);
+  const shown = useMemo(() => filterMemory(all, query, category, cats), [all, query, category, cats]);
+  const groups = useMemo(() => groupMemory(shown, cats), [shown, cats]);
+  const searching = Boolean(query.trim() || category);
+  const emptyCats = cats.filter((c) => !counts[c.key] && MEMORY_CATEGORIES.some((m) => m.key === c.key));
+  const who = (by: string) => (by === "user" ? "ti" : (agents.find((a) => a.id === by)?.name ?? "un agente"));
 
   return (
     <div className="board memory">
-      <div className="board-bar">
-        <h1>Memoria</h1>
-        <span className="muted">Tu perfil de vida. Todos los agentes lo consultan y lo amplían.</span>
-        <span style={{ flex: 1 }} />
-        <input className="memory-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar…" />
-        <button className={`btn ${trash ? "" : "ghost"}`} onClick={() => setTrash((t) => !t)}>
-          {trash ? "Volver" : "Olvidados"}
-        </button>
-        {!trash && (
-          <button className="btn primary" onClick={() => setEditing({ category: "quien_soy", title: "", content: "", tags: "" })}>
-            + Recuerdo
+      <div className="ui-page">
+        <PageHeader
+          title={trash ? "Olvidados" : "Memoria"}
+          count={entries ? all.length : undefined}
+          subtitle={trash ? "Recuerdos archivados. Puedes recuperarlos." : "Lo que el equipo sabe de ti. Todos lo consultan y lo amplían."}
+        >
+          <button
+            className={`btn ${trash ? "" : "ghost"}`}
+            onClick={() => {
+              setTrash((t) => !t);
+              setOpenId("");
+              setCategory("");
+            }}
+          >
+            {trash ? "← Volver" : "Olvidados"}
           </button>
+          {!trash && (
+            <button className="btn primary" onClick={() => setEditing(blank())}>
+              + Recuerdo
+            </button>
+          )}
+        </PageHeader>
+
+        {all.length > 0 && (
+          <Toolbar>
+            <SearchBox value={query} onChange={setQuery} placeholder="Buscar en la memoria…" />
+            <FilterChips
+              label="Filtrar por categoría"
+              value={category}
+              onChange={(k) => setCategory(k === category ? "" : k)}
+              options={[{ key: "", label: "Todas", count: all.length }, ...cats.filter((c) => counts[c.key]).map((c) => ({ key: c.key, label: c.label, icon: c.icon, count: counts[c.key] }))]}
+            />
+          </Toolbar>
         )}
-      </div>
-      {entries && entries.length === 0 && !trash && (
-        <div className="board-empty">
-          <p>La memoria está vacía.</p>
-          <p className="muted">Añade lo básico sobre ti (o cuéntaselo a Zen) y todo el equipo lo tendrá en cuenta.</p>
-        </div>
-      )}
-      <div className="memory-grid">
-        {cats
-          .filter((c) => byCat.has(c.key) || (!results && !trash && entries && entries.length > 0))
-          .map((c) => (
-            <section key={c.key} className="memory-cat">
-              <header>
-                <h2>{c.label}</h2>
-                <span className="muted small">{c.hint}</span>
-                {!trash && (
-                  <button className="icon-btn small" title="Añadir" onClick={() => setEditing({ category: c.key, title: "", content: "", tags: "" })}>
+
+        {!entries && <p className="muted">Cargando…</p>}
+
+        {entries && all.length === 0 && (
+          <EmptyState
+            icon={trash ? "🗑️" : "🧠"}
+            title={trash ? "No hay nada olvidado" : "La memoria está vacía"}
+            action={
+              !trash && (
+                <button className="btn primary" onClick={() => setEditing(blank())}>
+                  Añadir lo básico sobre mí
+                </button>
+              )
+            }
+          >
+            {trash ? "Lo que olvides aparecerá aquí por si quieres recuperarlo." : "Cuéntale a Zen quién eres o añade un recuerdo: todo el equipo lo tendrá en cuenta."}
+          </EmptyState>
+        )}
+
+        {all.length > 0 && groups.length === 0 && (
+          <EmptyState icon="🔍" title="Nada coincide">
+            Prueba con otra palabra o quita el filtro.{" "}
+            <button
+              className="ui-link"
+              onClick={() => {
+                setQuery("");
+                setCategory("");
+              }}
+            >
+              Ver todo
+            </button>
+          </EmptyState>
+        )}
+
+        {groups.map(({ cat, entries: list }) => {
+          const open = searching || !folded.has(cat.key);
+          return (
+            <Section
+              key={cat.key}
+              icon={cat.icon}
+              title={cat.label}
+              count={list.length}
+              hint={cat.hint}
+              open={open}
+              onToggle={searching ? undefined : () => toggleFold(cat.key)}
+              actions={
+                !trash && (
+                  <button className="icon-btn small" title={`Añadir a ${cat.label}`} onClick={() => setEditing(blank(cat.key))}>
                     +
                   </button>
-                )}
-              </header>
-              {(byCat.get(c.key) ?? []).map((e) => (
-                <article key={e.id} className={`memory-item ${fresh.has(`${e.id}:${e.version}`) ? "fresh" : ""}`}>
-                  <div className="memory-item-head">
-                    <strong>{e.title}</strong>
-                    <span className="memory-actions">
-                      {trash ? (
-                        <button className="btn small" onClick={() => api(`/api/memory/${e.id}`, { method: "PATCH", json: { archived: false } })}>
-                          Recuperar
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            className="icon-btn small"
-                            title="Editar"
-                            onClick={() => setEditing({ id: e.id, category: e.category, title: e.title, content: e.content, tags: e.tags.join(", ") })}
-                          >
-                            ✎
-                          </button>
-                          <button className="icon-btn small" title="Historial" onClick={() => setHistory(e)}>
-                            ⟲
-                          </button>
-                          <button className="icon-btn small" title="Olvidar" onClick={() => api(`/api/memory/${e.id}`, { method: "DELETE" })}>
-                            ×
-                          </button>
-                        </>
-                      )}
-                    </span>
-                  </div>
-                  <p>{e.content}</p>
-                  <footer>
-                    {e.tags.map((t) => (
-                      <span key={t} className="tag">
-                        {t}
-                      </span>
-                    ))}
-                    <span className="muted small">
-                      {e.source === "user" ? "Añadido" : "Guardado"} por {who(e.source)} · {new Date(e.updatedAt).toLocaleDateString("es-ES")}
-                    </span>
-                  </footer>
-                </article>
-              ))}
-            </section>
-          ))}
+                )
+              }
+            >
+              <div className="ui-cards">
+                {list.map((e) => (
+                  <MemoryCard
+                    key={e.id}
+                    e={e}
+                    cat={cat}
+                    trash={trash}
+                    who={who}
+                    open={openId === e.id}
+                    fresh={fresh.has(`${e.id}:${e.version}`)}
+                    onToggle={() => setOpenId(openId === e.id ? "" : e.id)}
+                    onEdit={() => setEditing({ id: e.id, category: e.category, title: e.title, content: e.content, tags: e.tags.join(", ") })}
+                    onHistory={() => setHistory(e)}
+                  />
+                ))}
+              </div>
+            </Section>
+          );
+        })}
+
+        {!trash && !searching && all.length > 0 && emptyCats.length > 0 && (
+          <div className="memory-empty-cats">
+            <span className="muted small">Sin recuerdos todavía:</span>
+            {emptyCats.map((c) => (
+              <button key={c.key} className="ui-filter" title={c.hint} onClick={() => setEditing(blank(c.key))}>
+                <span aria-hidden>{c.icon}</span>
+                {c.label}
+                <span className="ui-filter-count">+</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {editing && <Editor draft={editing} onClose={() => setEditing(null)} />}
       {history && <History entry={history} onClose={() => setHistory(null)} />}
     </div>
+  );
+}
+
+function MemoryCard({
+  e,
+  cat,
+  trash,
+  who,
+  open,
+  fresh,
+  onToggle,
+  onEdit,
+  onHistory,
+}: {
+  e: MemoryEntry;
+  cat: CategoryInfo;
+  trash: boolean;
+  who: (by: string) => string;
+  open: boolean;
+  fresh: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onHistory: () => void;
+}) {
+  const tags = open ? e.tags : e.tags.slice(0, 3);
+  return (
+    <Card
+      className={fresh ? "fresh" : ""}
+      title={e.title}
+      summary={summarize(e.content, 110)}
+      open={open}
+      onToggle={onToggle}
+      chips={
+        <>
+          {tags.map((t) => (
+            <Chip key={t}>#{t}</Chip>
+          ))}
+          {!open && e.tags.length > 3 && <Chip>+{e.tags.length - 3}</Chip>}
+        </>
+      }
+      meta={relativeDate(e.updatedAt)}
+      actions={
+        trash ? (
+          <button className="btn small" onClick={() => api(`/api/memory/${e.id}`, { method: "PATCH", json: { archived: false } })}>
+            Recuperar
+          </button>
+        ) : (
+          <>
+            <button className="btn small" onClick={onEdit}>
+              ✎ Editar
+            </button>
+            <button className="btn small ghost" onClick={onHistory}>
+              ⟲ Historial
+            </button>
+            <span style={{ flex: 1 }} />
+            <button className="btn small ghost" title="Se puede recuperar desde «Olvidados»" onClick={() => api(`/api/memory/${e.id}`, { method: "DELETE" })}>
+              Olvidar
+            </button>
+          </>
+        )
+      }
+    >
+      <p className="ui-detail">{e.content}</p>
+      <p className="ui-facts">
+        {cat.icon} {cat.label} · {e.source === "user" ? "Añadido" : "Guardado"} por {who(e.source)} · {new Date(e.updatedAt).toLocaleString("es-ES", { dateStyle: "medium", timeStyle: "short" })}
+        {e.version > 1 && ` · ${plural(e.version, "versión", "versiones")}`}
+      </p>
+    </Card>
   );
 }

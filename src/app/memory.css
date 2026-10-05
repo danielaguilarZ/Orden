@@ -1,90 +1,14 @@
-/* ───────────── Memoria (fase 4) ───────────── */
+/* ───────────── Memoria (tarjetas del kit común: ui-kit.css) ───────────── */
 
-.memory-search {
-  width: 220px;
-}
-
-.memory-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-  align-items: start;
-}
-
-.memory-cat {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--panel);
-}
-
-.memory-cat header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.memory-cat header h2 {
-  margin: 0;
-  font-family: var(--font-pixel), monospace;
-  font-weight: 500;
-  font-size: 17px;
-  white-space: nowrap;
-}
-
-.memory-cat header .muted {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.memory-item {
-  padding: 9px 11px;
-  border-radius: 10px;
-  background: var(--bg-2);
-}
-
-.memory-item-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.memory-item-head strong {
-  flex: 1;
-  font-size: 13.5px;
-}
-
-.memory-actions {
-  display: flex;
-  opacity: 0.4;
-}
-
-.memory-item:hover .memory-actions {
-  opacity: 1;
-}
-
-.memory-item p {
-  margin: 4px 0 6px;
-  white-space: pre-wrap;
-  line-height: 1.4;
-  font-size: 13px;
-}
-
-.memory-item footer {
+/* Categorías sin recuerdos: atajos para añadir el primero */
+.memory-empty-cats {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-}
-
-.memory-item footer .muted {
-  margin-left: auto;
+  gap: 6px;
+  margin-top: 30px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
 }
 
 .versions small.pre {

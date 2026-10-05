@@ -1,53 +1,5 @@
 /* ───────────── Rutinas y actividad (fase 5) ───────────── */
 
-.routine-list {
-  list-style: none;
-  margin: 0;
-  padding: 10px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.routine-list li {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--bg-2);
-}
-
-.routine-list li.off {
-  opacity: 0.55;
-}
-
-.routine-main {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.routine-main p {
-  margin: 4px 0 0;
-  font-size: 12.5px;
-  color: var(--muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.routine-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.routine-actions .btn {
-  margin-left: auto;
-}
-
 .routine-form {
   padding: 14px 16px;
   display: flex;
@@ -58,8 +10,22 @@
 .templates {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 4px 16px 16px;
+  gap: 8px;
+  padding: 18px 16px 16px;
+}
+
+/* Rutinas en la ficha del agente (tarjetas del kit común) */
+.routines-head {
+  padding: 14px 16px 0;
+}
+
+.routine-cards {
+  padding: 0 16px;
+}
+
+.routines .ui-empty {
+  margin: 28px auto;
+  padding: 0 16px;
 }
 
 .schedule-editor {
@@ -144,15 +110,23 @@
 }
 
 /* Actividad */
-.activity .board-bar select {
+.activity .ui-page-actions select {
   width: auto;
 }
 
 .activity-layout {
   display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 20px;
+  grid-template-columns: 1fr 300px;
+  gap: 28px;
   align-items: start;
+}
+
+.feed-days {
+  min-width: 0;
+}
+
+.feed-more {
+  margin-top: 14px;
 }
 
 @media (max-width: 900px) {
@@ -179,15 +153,53 @@
   animation: fade-up 0.2s ease both;
 }
 
-.feed li:hover {
+.feed li:hover,
+.feed li.open {
   background: var(--panel);
 }
 
-.feed p {
-  margin: 0 0 2px;
+.feed-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-.feed .k-error p {
+/* Dos líneas como máximo; al pulsar se ve entero */
+.feed-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.45;
+}
+
+.feed li.open .feed-text {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.feed-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-time {
+  flex-shrink: 0;
+  padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.feed .k-error .feed-text {
   color: #f3a0a0;
 }
 
@@ -222,11 +234,8 @@
   top: 0;
 }
 
-.upcoming h2 {
-  margin: 0 0 10px;
-  font-family: var(--font-pixel), monospace;
-  font-weight: 500;
-  font-size: 18px;
+.upcoming .ui-section-head {
+  margin-bottom: 10px;
 }
 
 .upcoming ul {

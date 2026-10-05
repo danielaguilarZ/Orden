@@ -2,9 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, onEvent } from "@/client/store";
-import { answerLabel, byOldest, byResolved, MAX_ANSWER_LENGTH, TAB_LABEL, viewOf, type Decision, type DecisionAction } from "@/lib/decisions/labels";
+import {
+  answerParts,
+  answerTone,
+  byOldest,
+  byResolved,
+  decisionKind,
+  MAX_ANSWER_LENGTH,
+  TAB_LABEL,
+  viewOf,
+  type Decision,
+  type DecisionAction,
+} from "@/lib/decisions/labels";
+import { hasMore, relativeDate, summarize } from "@/lib/ui/text";
 import { Markdown } from "./Markdown";
 import { useMounted } from "./panels/common";
+import { Chip, EmptyState, PageHeader, Section, useToggleSet } from "./ui/kit";
 
 const POSTPONE: { days: number; label: string }[] = [
   { days: 1, label: "Mañana" },
@@ -25,6 +38,7 @@ type Act = (d: Decision, accion: DecisionAction, extra?: { respuesta?: string; o
 export function DecisionsPage() {
   const [list, setList] = useState<Decision[] | null>(null);
   const [error, setError] = useState("");
+  const [opened, toggle] = useToggleSet();
   const mounted = useMounted();
 
   const load = useCallback(
@@ -69,47 +83,45 @@ export function DecisionsPage() {
 
   return (
     <div className="board decisions">
-      <div className="board-bar">
-        <h1>{TAB_LABEL}</h1>
-        <span className="muted">Lo que el equipo necesita que decidas. Tu respuesta le llega al agente que lo preguntó.</span>
-      </div>
+      <div className="ui-page narrow">
+        <PageHeader title={TAB_LABEL} count={list ? groups.pending.length : undefined} subtitle="Lo que el equipo necesita de ti. Tu respuesta le llega al agente que preguntó." />
 
-      {error && <p className="bad-text">{error}</p>}
-      {!list && !error && <p className="muted">Cargando…</p>}
-      {list && !groups.pending.length && (
-        <div className="dec-empty">
-          <strong>Todo al día</strong>
-          <p className="muted">No tienes nada pendiente. Cuando un agente necesite algo de ti, aparecerá aquí.</p>
-        </div>
-      )}
+        {error && <p className="bad-text">{error}</p>}
+        {!list && !error && <p className="muted">Cargando…</p>}
+        {list && !groups.pending.length && (
+          <EmptyState icon="✅" title="Todo al día">
+            No tienes nada pendiente. Cuando un agente necesite algo de ti, aparecerá aquí.
+          </EmptyState>
+        )}
 
-      <div className="dec-list">
-        {groups.pending.map((d) => (
-          <DecisionCard key={d.id} d={d} mounted={mounted} onAct={act} />
-        ))}
-      </div>
-
-      {groups.postponed.length > 0 && (
-        <details className="dec-fold">
-          <summary>Aplazadas ({groups.postponed.length})</summary>
-          <div className="dec-list">
-            {groups.postponed.map((d) => (
+        {groups.pending.length > 0 && (
+          <div className="ui-stack">
+            {groups.pending.map((d) => (
               <DecisionCard key={d.id} d={d} mounted={mounted} onAct={act} />
             ))}
           </div>
-        </details>
-      )}
+        )}
 
-      {groups.resolved.length > 0 && (
-        <details className="dec-fold">
-          <summary>Resueltas ({groups.resolved.length})</summary>
-          <ul className="dec-history">
-            {groups.resolved.map((d) => (
-              <ResolvedRow key={d.id} d={d} mounted={mounted} onAct={act} />
-            ))}
-          </ul>
-        </details>
-      )}
+        {groups.postponed.length > 0 && (
+          <Section className="dec-fold" icon="⏳" title="Aplazadas" count={groups.postponed.length} open={opened.has("aplazadas")} onToggle={() => toggle("aplazadas")}>
+            <div className="ui-stack">
+              {groups.postponed.map((d) => (
+                <DecisionCard key={d.id} d={d} mounted={mounted} onAct={act} />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {groups.resolved.length > 0 && (
+          <Section className="dec-fold" icon="🗂️" title="Resueltas" count={groups.resolved.length} open={opened.has("resueltas")} onToggle={() => toggle("resueltas")}>
+            <ul className="dec-history">
+              {groups.resolved.map((d) => (
+                <ResolvedRow key={d.id} d={d} mounted={mounted} onAct={act} />
+              ))}
+            </ul>
+          </Section>
+        )}
+      </div>
     </div>
   );
 }
@@ -119,6 +131,7 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
   const [choice, setChoice] = useState("");
   const [later, setLater] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showContext, setShowContext] = useState(false);
 
   const run = async (accion: DecisionAction, extra: { respuesta?: string; opcion?: string; dias?: number } = {}) => {
     setBusy(true);
@@ -139,19 +152,44 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
     else if (canAnswer) run("responder", { respuesta, opcion: choice || undefined });
   };
   const placeholder = d.approval ? "Comentario o motivo (opcional)" : d.options.length ? "Añade un comentario (opcional)" : "Escribe tu respuesta…";
+  const kind = decisionKind(d);
+  const long = hasMore(d.context, 160);
+  const postponedUntil = d.postponedUntil && mounted && new Date(d.postponedUntil) > new Date() ? d.postponedUntil : null;
 
   return (
     <article className="dec-card">
       <header className="dec-head">
         <h2>{d.title}</h2>
-        <span className="muted small">
-          {d.authorName || "Equipo"} · {mounted ? date(d.createdAt) : d.createdAt.slice(0, 10)}
-          {d.postponedUntil && mounted && new Date(d.postponedUntil) > new Date() && <> · aplazada hasta {date(d.postponedUntil)}</>}
-        </span>
+        <div className="dec-meta">
+          <Chip tone="accent" icon={kind.icon}>
+            {kind.label}
+          </Chip>
+          <Chip icon="👤">{d.authorName || "Equipo"}</Chip>
+          {postponedUntil && <Chip icon="⏳">hasta {date(postponedUntil)}</Chip>}
+          <span className="muted small dec-age" title={mounted ? date(d.createdAt) : undefined}>
+            {mounted ? relativeDate(d.createdAt) : d.createdAt.slice(0, 10)}
+          </span>
+        </div>
       </header>
       {d.context && (
         <div className="dec-context">
-          <Markdown text={d.context} />
+          {long && !showContext ? (
+            <p>
+              {summarize(d.context, 160)}{" "}
+              <button className="ui-link" onClick={() => setShowContext(true)}>
+                Ver contexto
+              </button>
+            </p>
+          ) : (
+            <>
+              <Markdown text={d.context} />
+              {long && (
+                <button className="ui-link" onClick={() => setShowContext(false)}>
+                  Ocultar
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
       {d.options.length > 0 && (
@@ -217,15 +255,23 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
 
 function ResolvedRow({ d, mounted, onAct }: { d: Decision; mounted: boolean; onAct: Act }) {
   const [busy, setBusy] = useState(false);
+  const { state, detail } = answerParts(d);
   return (
     <li className={`dec-row ans-${d.answerKind ?? "none"}`}>
       <div className="dec-row-main">
         <strong>{d.title}</strong>
-        <span className="small">{answerLabel(d)}</span>
+        <span className="dec-row-meta">
+          <Chip tone={answerTone(d.answerKind)}>{state}</Chip>
+          {detail && (
+            <span className="small muted dec-row-answer" title={detail}>
+              {detail}
+            </span>
+          )}
+        </span>
       </div>
-      <span className="muted small">
+      <span className="muted small dec-row-when">
         {d.authorName || "Equipo"}
-        {d.resolvedAt && mounted && <> · {date(d.resolvedAt)}</>}
+        {d.resolvedAt && mounted && <> · {relativeDate(d.resolvedAt)}</>}
       </span>
       <button
         className="btn small ghost"
