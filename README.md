@@ -49,7 +49,22 @@ También: `servicio:estado`, `servicio:parar`, `servicio:arrancar` y `servicio:q
 | **Memoria** | Tu perfil de vida (quién eres, objetivos, preferencias, personas…). La consultan y amplían todos los agentes. |
 | **Actividad** | Registro de encargos, rutinas, cambios y errores. |
 | **Conexiones** | Servicios externos opcionales (GitHub, Google Calendar en solo lectura) y el permiso de cada agente. No hay ninguna conectada de serie. |
-| **Acción humana** | Propuestas del equipo para aceptar, rechazar o aplazar, y lo que necesitan de ti. |
+| **Decisiones** | Solo lo que el equipo necesita que decidas, con un contador en la pestaña. |
+
+### Decisiones
+
+Cuando un agente necesita algo de ti (aprobar una idea, elegir entre opciones, un dato, un login), lo plantea
+como **decisión**: título, contexto breve, opciones sugeridas si las hay y una caja para responder. Según el caso
+responderás con texto, con una opción o con **Aceptar / Rechazar** (con comentario opcional); «Más tarde» la aplaza
+1 día, 1 semana o 1 mes. Tu respuesta le llega al agente que la planteó como mensaje en su chat y la decisión pasa
+a «Resueltas» (plegado, con opción de reabrirla). Lo rechazado no se vuelve a plantear.
+
+- Código en `src/lib/decisions/` (`labels.ts` sin dependencias de servidor, `repo.ts`, `tools.ts`), pestaña en
+  `/decisiones` (la antigua `/propuestas` redirige) y API en `/api/decisions`.
+- Herramientas de los agentes: `decision_crear`, `decisiones_listar` y `decision_retirar` (sustituyen a
+  `propuesta_crear` / `propuestas_listar`).
+- La migración 15 pasa las propuestas pendientes a decisiones y lo pendiente del antiguo panel «Acción humana» a
+  decisiones de Zen. No borra nada.
 
 Ejemplos de encargos para Zen:
 
@@ -92,7 +107,7 @@ src/
   app/         páginas y rutas API
   components/  interfaz React
   client/      estado del cliente y conexión SSE
-  lib/         BD y migraciones, agentes, paneles, memoria, rutinas, conexiones, archivos
+  lib/         BD y migraciones, agentes, paneles, memoria, rutinas, conexiones, archivos, decisiones
   living/      motor isométrico (plano, A*, rasterizador, muebles, avatares, decorador)
 worker/        proceso en segundo plano (encargos, rutinas, latido)
 scripts/       arranque, servicio de Windows, login de Claude y vistas previas

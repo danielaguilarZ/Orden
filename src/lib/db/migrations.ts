@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 export interface Migration {
@@ -426,6 +427,104 @@ export const migrations: Migration[] = [
         CREATE INDEX proposals_status ON proposals(status);
         CREATE UNIQUE INDEX proposals_source ON proposals(source) WHERE source IS NOT NULL;
       `);
+    },
+  },
+  {
+    version: 15,
+    name: "decisiones",
+    up: (db) => {
+      db.exec(`
+        -- Pestaña «Decisiones» (sustituye a «Propuestas» y al panel «Acción
+        -- humana»): lo que un agente necesita que el usuario decida o le dé.
+        -- status: pendiente | resuelta. options: JSON con respuestas sugeridas.
+        -- approval: 1 = sí/no (botones Aceptar/Rechazar). answer_kind: aceptar |
+        -- rechazar | opcion | texto | retirada. task_id: encargo con el que la
+        -- respuesta llegó al agente (null = aún sin avisar). source: origen de
+        -- lo migrado, para no duplicar.
+        CREATE TABLE decisions (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          context TEXT NOT NULL DEFAULT '',
+          options TEXT NOT NULL DEFAULT '[]',
+          approval INTEGER NOT NULL DEFAULT 0,
+          author_id TEXT,
+          author_name TEXT NOT NULL DEFAULT '',
+          status TEXT NOT NULL DEFAULT 'pendiente',
+          answer_kind TEXT,
+          answer TEXT,
+          postponed_until TEXT,
+          task_id TEXT,
+          source TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          resolved_at TEXT
+        );
+        CREATE INDEX decisions_status ON decisions(status);
+        CREATE UNIQUE INDEX decisions_source ON decisions(source) WHERE source IS NOT NULL;
+
+        -- Propuestas → decisiones de sí/no. Las ya decididas pasan como resueltas
+        -- (marcadas como avisadas para no reenviarlas). La tabla proposals se
+        -- conserva como copia, pero ya no se usa.
+        INSERT INTO decisions (id, title, context, options, approval, author_id, author_name, status, answer_kind, answer,
+                               postponed_until, task_id, source, created_at, updated_at, resolved_at)
+        SELECT id, title, description, '[]', 1, author_id, author_name,
+               CASE WHEN status = 'pendiente' THEN 'pendiente' ELSE 'resuelta' END,
+               CASE status WHEN 'pendiente' THEN NULL WHEN 'rechazada' THEN 'rechazar' ELSE 'aceptar' END,
+               CASE WHEN status = 'rechazada' THEN reject_reason ELSE NULL END,
+               CASE WHEN status = 'pendiente' THEN postponed_until ELSE NULL END,
+               CASE WHEN status = 'pendiente' THEN NULL ELSE COALESCE(task_id, 'migrada') END,
+               'propuesta:' || id, created_at, updated_at,
+               CASE WHEN status = 'pendiente' THEN NULL ELSE COALESCE(finished_at, decided_at, updated_at) END
+        FROM proposals;
+      `);
+
+      // Lo pendiente del panel de lista «Acción humana · lo que necesito de ti»
+      // pasa a decisiones de respuesta libre del jefe. El panel no se toca.
+      const plain = (s: string) =>
+        s
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .toLowerCase()
+          .trim();
+      const lists = db.prepare("SELECT id, title, data, created_at FROM panels WHERE type = 'lista' AND archived = 0").all() as {
+        id: string;
+        title: string;
+        data: string;
+        created_at: string;
+      }[];
+      const panel =
+        lists.find((p) => plain(p.title) === plain("Acción humana · lo que necesito de ti")) ?? lists.find((p) => plain(p.title).startsWith("accion humana"));
+      if (!panel) return;
+      let items: unknown[] = [];
+      try {
+        const data = JSON.parse(panel.data) as { items?: unknown };
+        if (Array.isArray(data.items)) items = data.items;
+      } catch {
+        return;
+      }
+      const chief = db.prepare("SELECT id, name FROM agents WHERE is_chief = 1 LIMIT 1").get() as { id: string; name: string } | undefined;
+      const insert = db.prepare(
+        `INSERT OR IGNORE INTO decisions (id, title, context, options, approval, author_id, author_name, status, source, created_at, updated_at)
+         VALUES (?, ?, ?, '[]', 0, ?, ?, 'pendiente', ?, ?, ?)`,
+      );
+      const at = new Date().toISOString();
+      for (const raw of items) {
+        const it = raw as { id?: unknown; text?: unknown; done?: unknown; notes?: unknown; due?: unknown };
+        if (it.done === true || typeof it.text !== "string" || !it.text.trim()) continue;
+        const context = [typeof it.notes === "string" ? it.notes.trim() : "", typeof it.due === "string" && it.due ? `Para: ${it.due}` : ""]
+          .filter(Boolean)
+          .join("\n\n");
+        insert.run(
+          randomUUID(),
+          it.text.trim().slice(0, 140),
+          context,
+          chief?.id ?? null,
+          chief?.name ?? "",
+          `accion-humana:${panel.id}:${typeof it.id === "string" ? it.id : it.text.trim()}`,
+          panel.created_at,
+          at,
+        );
+      }
     },
   },
 ];
