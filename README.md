@@ -48,8 +48,7 @@ También: `servicio:estado`, `servicio:parar`, `servicio:arrancar` y `servicio:q
 | **Paneles** | Tus listas, tableros, calendarios, tablas, notas, hábitos y gráficos. Créalos con una plantilla (un clic) o pídeselos a un agente; se editan a mano y cada uno tiene «Pedir cambios» y un menú «⋯» (exportar `.md`/`.csv`/`.xlsx`/`.ics`, historial, tamaño, papelera). Pestaña **Archivos** para tus documentos. |
 | **Memoria** | Tu perfil de vida (quién eres, objetivos, preferencias, personas…). La consultan y amplían todos los agentes. |
 | **Actividad** | Registro de encargos, rutinas, cambios y errores. |
-| **Conexiones** | Servicios externos opcionales y el permiso de cada agente (lectura o completo). No hay ninguna conectada de serie. Ver abajo. |
-| **Acción humana** | Propuestas del equipo para aceptar, rechazar o aplazar, y lo que necesitan de ti. |
+
 
 ### Conexiones disponibles
 
@@ -108,7 +107,7 @@ src/
   app/         páginas y rutas API
   components/  interfaz React
   client/      estado del cliente y conexión SSE
-  lib/         BD y migraciones, agentes, paneles, memoria, rutinas, conexiones, archivos
+  lib/         BD y migraciones, agentes, paneles, memoria, rutinas, conexiones, archivos, decisiones
   living/      motor isométrico (plano, A*, rasterizador, muebles, avatares, decorador)
 worker/        proceso en segundo plano (encargos, rutinas, latido)
 scripts/       arranque, servicio de Windows, login de Claude y vistas previas

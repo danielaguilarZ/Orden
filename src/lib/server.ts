@@ -6,7 +6,7 @@ import { lastEventId } from "./events";
 import { listPanels } from "./repo/panels";
 import { getStoredUsage } from "./claude/usage";
 import { ensureFilesSeed } from "./files/repo";
-import { countPending } from "./proposals/repo";
+import { countPending } from "./decisions/repo";
 
 /** Arranque perezoso en el servidor: BD migrada y casa sembrada. */
 let booted = false;
@@ -29,7 +29,7 @@ export function snapshot() {
     panels: listPanels(),
     usage: getStoredUsage(),
     system: systemStatus(),
-    proposalsPending: countPending(),
+    decisionsPending: countPending(),
     lastEventId: lastEventId(),
   };
 }

@@ -15,8 +15,8 @@ export interface ClientState {
   rooms: Room[];
   panels: Panel[];
   usage: ClaudeUsage | null;
-  /** Propuestas pendientes de decidir (contador de la pestaña). */
-  proposalsPending: number;
+  /** Decisiones pendientes de responder (contador de la pestaña). */
+  decisionsPending: number;
   /** Último panel que tocó un agente (para el panel en vivo del living). */
   livePanel: { panelId: string; agentId: string; at: number } | null;
   worker: HeartbeatInfo | null;
@@ -32,7 +32,7 @@ export interface ClientState {
 type Listener = () => void;
 type EventHandler = (e: OrdenEvent) => void;
 
-let state: ClientState = { agents: [], rooms: [], panels: [], usage: null, proposalsPending: 0, livePanel: null, worker: null, claude: null, live: false, restarting: null, lastEventId: 0, roomEdit: null };
+let state: ClientState = { agents: [], rooms: [], panels: [], usage: null, decisionsPending: 0, livePanel: null, worker: null, claude: null, live: false, restarting: null, lastEventId: 0, roomEdit: null };
 const listeners = new Set<Listener>();
 const eventHandlers = new Set<EventHandler>();
 
@@ -72,7 +72,7 @@ export function hydrate(init: {
   panels: Panel[];
   usage: ClaudeUsage | null;
   system: { worker: HeartbeatInfo | null };
-  proposalsPending?: number;
+  decisionsPending?: number;
   lastEventId: number;
 }) {
   if (state.lastEventId > init.lastEventId) return;
@@ -82,7 +82,7 @@ export function hydrate(init: {
     panels: init.panels,
     usage: init.usage,
     worker: init.system.worker,
-    proposalsPending: init.proposalsPending ?? 0,
+    decisionsPending: init.decisionsPending ?? 0,
     lastEventId: init.lastEventId,
   });
 }
@@ -183,9 +183,9 @@ function apply(e: OrdenEvent) {
     case "usage.updated":
       set({ usage: p as unknown as ClaudeUsage });
       break;
-    case "proposal.created":
-    case "proposal.updated":
-      if (typeof p.pending === "number") set({ proposalsPending: p.pending });
+    case "decision.created":
+    case "decision.updated":
+      if (typeof p.pending === "number") set({ decisionsPending: p.pending });
       break;
     case "room.deleted":
       set({ rooms: state.rooms.filter((r) => r.id !== p.id), ...(state.roomEdit?.roomId === p.id && { roomEdit: null }) });

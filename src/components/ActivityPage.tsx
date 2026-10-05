@@ -15,7 +15,8 @@ const KINDS: Record<string, string> = {
   exportacion: "Exportaciones",
   conexion: "Conexiones",
   archivos: "Archivos",
-  propuestas: "Propuestas",
+  decisiones: "Decisiones",
+  propuestas: "Propuestas (antiguas)",
   error: "Errores",
   sistema: "Sistema",
 };

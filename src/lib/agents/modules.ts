@@ -11,4 +11,4 @@ import "../claude/tools";
 import "../dev/admin";
 import "../connections/agents";
 import "../files/tools";
-import "../proposals/tools";
+import "../decisions/tools";
