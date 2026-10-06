@@ -3,16 +3,25 @@ import { getService, listServices, type OAuthState } from "./registry";
 import "./services";
 
 /**
- * Conexiones: gestión (alta y configuración) y sincronización de los paneles
- * vivos. Lo de los agentes está en agents.ts. No se crea ninguna conexión
- * de serie: se añaden desde la pestaña Conexiones.
+ * Conexiones: gestión (alta y configuración). Lo de los agentes está en
+ * agents.ts. No se crea ninguna conexión de serie: se añaden desde la pestaña
+ * Conexiones. Ningún servicio escribe solo en Orden: los agentes consultan
+ * cada servicio cuando lo necesitan.
  */
 
 /** Crea una conexión validando su configuración con el servicio. */
 export function addConnection(service: string, config: Record<string, unknown>, name?: string): Connection {
   const s = getService(service);
   const cfg = s.normalizeConfig(config);
-  if (listConnections(service).some((c) => JSON.stringify(c.config) === JSON.stringify(cfg))) throw new Error("Esa conexión ya existe.");
+  // Se compara normalizada: las antiguas pueden llevar campos que ya no se usan (p. ej. «panel»).
+  const same = (c: Connection) => {
+    try {
+      return JSON.stringify(s.normalizeConfig(c.config)) === JSON.stringify(cfg);
+    } catch {
+      return false;
+    }
+  };
+  if (listConnections(service).some(same)) throw new Error("Esa conexión ya existe.");
   return createConnection({ service, name: name?.trim() || s.defaultName(cfg), config: cfg });
 }
 
@@ -28,38 +37,6 @@ export function connectionView(c: Connection): PublicConnection & { oauth: OAuth
   const s = getService(c.service);
   const pub = publicConnection(c);
   return { ...pub, secretHint: s.supportsSecret ? pub.secretHint : null, oauth: s.oauthState?.(c) ?? null };
-}
-
-const syncing = new Set<string>();
-
-/** Lo llama el worker cada minuto: sincroniza las conexiones que tocan. */
-export async function syncDueConnections(at = new Date()): Promise<string[]> {
-  const done: string[] = [];
-  for (const c of listConnections()) {
-    const s = getService(c.service);
-    if (!c.enabled || !s.sync || syncing.has(c.id)) continue;
-    const every = s.syncEveryMs ?? 10 * 60_000;
-    if (c.lastSyncAt && at.getTime() - Date.parse(c.lastSyncAt) < every) continue;
-    syncing.add(c.id);
-    try {
-      if ((await s.sync(c, at)) !== false) done.push(c.name);
-    } catch {
-      // El error ya queda guardado en la conexión y en Actividad.
-    } finally {
-      syncing.delete(c.id);
-    }
-  }
-  return done;
-}
-
-/** Sincroniza una conexión ya (botón «Actualizar ahora»). */
-export async function syncConnectionNow(id: string): Promise<Connection> {
-  const c = getConnection(id);
-  if (!c) throw new Error("Esa conexión no existe.");
-  const s = getService(c.service);
-  if (!s.sync) throw new Error("Este servicio no tiene panel que actualizar.");
-  if ((await s.sync(c)) === false) throw new Error(s.authKind === "oauth" ? "Primero hay que autorizar la conexión («Autorizar con Google»)." : "No había nada que actualizar.");
-  return getConnection(id)!;
 }
 
 export { listServices };

@@ -1,13 +1,12 @@
 import { route } from "@/lib/http";
-import { syncConnectionNow } from "@/lib/connections";
 import { finishAuth } from "@/lib/connections/google/api";
 import { logActivity } from "@/lib/repo/system";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Vuelta de Google tras autorizar. Guarda los tokens (cifrados), hace un
- * primer volcado al panel y devuelve al usuario a Conexiones con el resultado.
+ * Vuelta de Google tras autorizar. Guarda los tokens (cifrados) y devuelve al
+ * usuario a Conexiones con el resultado.
  */
 export const GET = route(async (req) => {
   const url = new URL(req.url);
@@ -21,16 +20,7 @@ export const GET = route(async (req) => {
   try {
     const c = await finishAuth(state, code);
     logActivity("sistema", `Google Calendar autorizado (solo lectura) en «${c.name}»`);
-    let extra = "";
-    if (c.config.panel !== false) {
-      try {
-        await syncConnectionNow(c.id);
-        extra = " Primer volcado al panel hecho.";
-      } catch (err) {
-        extra = ` (El volcado ha fallado: ${(err as Error).message})`;
-      }
-    }
-    return back("ok", `Google Calendar autorizado en solo lectura.${extra}`);
+    return back("ok", "Google Calendar autorizado en solo lectura.");
   } catch (err) {
     logActivity("error", `Autorización de Google Calendar: ${(err as Error).message}`);
     return back("error", (err as Error).message);
