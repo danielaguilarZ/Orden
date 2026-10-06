@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 
 /**
  * Fondo de las ventanas emergentes. Se pinta en <body> con un portal para que
- * ningún contenedor animado (paneles, ficha del agente…) lo recorte o lo
+ * ningún contenedor animado (tarjetas, ficha del agente…) lo recorte o lo
  * desplace: siempre ocupa la pantalla entera.
  */
 export function Backdrop({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
