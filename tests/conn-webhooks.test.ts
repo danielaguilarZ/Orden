@@ -2,12 +2,9 @@ import { describe, expect, it } from "vitest";
 import { addConnection } from "@/lib/connections";
 import { getService } from "@/lib/connections/registry";
 import { checkWebhookUrl, isPrivateHost, webhookOutLimit } from "@/lib/connections/webhook-out";
-import { receiveLimit, receiveWebhook, sameSecret, summarize, taskLimit, tokenFrom, WebhookError } from "@/lib/connections/webhook-in";
-import { getConnection } from "@/lib/repo/connections";
-import { getPanel } from "@/lib/repo/panels";
+import { receivedItems, receiveLimit, receiveWebhook, sameSecret, summarize, taskLimit, tokenFrom, WebhookError } from "@/lib/connections/webhook-in";
 import { getTask } from "@/lib/repo/tasks";
 import { updateConnection } from "@/lib/repo/connections";
-import type { ListData } from "@/lib/panels/types";
 import { callTool, connect, jsonBody, mockFetch, team, textOf, toolNames, useConnTestEnv } from "./helpers/conn";
 
 const OUT = "https://hooks.zapier.com/hooks/catch/123/abcSECRETxyz/";
@@ -81,14 +78,14 @@ describe("Webhook entrante", () => {
     expect(status(() => receiveWebhook(noKey.id, "", "{}"))).toBe(403);
   });
 
-  it("apunta en su panel (lo más nuevo arriba) y los agentes con permiso lo leen", async () => {
+  it("apunta en su bandeja (lo más nuevo arriba, sin paneles) y los agentes con permiso lo leen", async () => {
     const c = connect("webhook_entrada", { nombre: "Alertas" }, KEY, { agent: team.ana, level: "lectura" });
+    expect(textOf(await callTool(team.ana, "webhook_recibidos", {}))).toContain("Todavía no ha llegado nada");
     receiveWebhook(c.id, KEY, JSON.stringify({ texto: "Copia de seguridad hecha" }), new Date("2026-10-05T08:00:00Z"));
     const r = receiveWebhook(c.id, KEY, "Disco al 90 %", new Date("2026-10-05T09:30:00Z"));
     expect(r.taskId).toBeUndefined();
-    const panel = getPanel(getConnection(c.id)!.statusPanelId!)!;
-    expect(panel.title).toBe("Webhook · Alertas");
-    expect((panel.data as ListData).items.map((i) => i.text)).toEqual(["2026-10-05 11:30 · Disco al 90 %", "2026-10-05 10:00 · Copia de seguridad hecha"]);
+    expect(receivedItems(c.id).map((i) => i.text)).toEqual(["2026-10-05 11:30 · Disco al 90 %", "2026-10-05 10:00 · Copia de seguridad hecha"]);
+    expect(receivedItems(c.id)[1].notes).toContain("Copia de seguridad hecha");
     expect(textOf(await callTool(team.ana, "webhook_recibidos", {}))).toContain("2026-10-05 11:30 · Disco al 90 %");
   });
 
