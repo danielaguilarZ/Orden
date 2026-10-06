@@ -5,17 +5,16 @@ import { logActivity } from "../../repo/system";
 import { redact } from "../../secrets";
 import type { AgentGrant } from "../registry";
 import { CalendarReader, type GEvent } from "./api";
-import { calendarsOf, defaultWindow, dumpSummary, dumpToPanel, fetchEvents, plainText, WINDOW_FUTURE_DAYS, WINDOW_PAST_DAYS } from "./sync";
+import { calendarsOf, fetchEvents, plainText } from "./sync";
 import { addDays, daysBetween, isDay } from "./time";
 
 /**
  * Herramientas de Google Calendar (solo lectura) para quien tenga permiso.
- * Ninguna escribe en Google: leer eventos, ver calendarios y volcar a un
- * panel de Orden. Cada uso queda en Actividad.
+ * Ninguna escribe en Google: leer eventos y ver calendarios. Cada uso queda
+ * en Actividad.
  */
 
 const MAX_RANGE_DAYS = 93;
-const MAX_DUMP_DAYS = 186;
 const MAX_LIST = 300;
 
 const fmtDay = (day: string) =>
@@ -108,22 +107,6 @@ export function googleCalendarTools(ctx: ToolContext, grants: AgentGrant[]): Too
           return list
             .map((x) => `- ${x.summary ?? x.id}${x.primary ? " (principal)" : ""} · id ${x.id}${on.has(x.id) || (x.primary && on.has("primary")) ? " · conectado" : ""}`)
             .join("\n") || "No hay calendarios.";
-        }),
-    ),
-    defineTool(
-      "google_calendario_volcar",
-      `Copia los eventos de Google Calendar (todos los calendarios conectados) al panel de calendario de Orden sin duplicar: usa el id del evento de Google, actualiza los que cambian y quita los borrados en Google. Por defecto, desde hace ${WINDOW_PAST_DAYS} días hasta dentro de ${WINDOW_FUTURE_DAYS}. No escribe nada en Google.`,
-      {
-        desde: z.string().optional().describe("Primer día, AAAA-MM-DD"),
-        hasta: z.string().optional().describe(`Último día (incluido), AAAA-MM-DD. Máx. ${MAX_DUMP_DAYS} días`),
-      },
-      (a: { desde?: string; hasta?: string }) =>
-        guard(async () => {
-          const def = defaultWindow();
-          const r = a.desde || a.hasta ? range(a.desde ?? def.from, a.hasta ?? addDays(def.toExclusive, -1), MAX_DUMP_DAYS) : { from: def.from, toExclusive: def.toExclusive };
-          const res = await dumpToPanel(c, r.from, r.toExclusive, { by: ctx.agent.id, taskId: ctx.task.id });
-          audit(`volcado: ${dumpSummary(res)}`, { panelId: res.panelId });
-          return `Volcado hecho: ${dumpSummary(res)}`;
         }),
     ),
   ];

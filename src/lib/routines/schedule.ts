@@ -107,26 +107,26 @@ export const ROUTINE_TEMPLATES: { name: string; prompt: string; schedule: Schedu
   {
     name: "Resumen de cada mañana",
     prompt:
-      "Prepara el resumen del día: eventos de hoy en los calendarios, tareas pendientes y fechas límite cercanas en los paneles, y algo relevante de la memoria. Déjalo en el panel de notas «Resumen del día» (créalo si no existe) y responde con 3-5 viñetas.",
+      "Prepara el resumen del día: eventos de hoy en los calendarios conectados, tareas pendientes y fechas límite cercanas de la memoria, y algo relevante de tus archivos. Guárdalo en Archivos como «Daily/resumen AAAA-MM-DD» (con la fecha de hoy) y responde con 3-5 viñetas.",
     schedule: { tipo: "diaria", hora: "08:00" },
     chiefOnly: true,
   },
   {
     name: "Revisión semanal de proyectos",
     prompt:
-      "Revisa los proyectos abiertos (memoria y paneles): qué avanzó, qué está bloqueado y cuáles son los próximos pasos. Actualiza la memoria si algo cambió y responde con un resumen breve.",
+      "Revisa los proyectos abiertos (memoria y archivos): qué avanzó, qué está bloqueado y cuáles son los próximos pasos. Actualiza la memoria si algo cambió y responde con un resumen breve.",
     schedule: { tipo: "semanal", dias: [7], hora: "19:00" },
   },
   {
     name: "Aviso de fechas límite",
     prompt:
-      "Busca en los paneles tareas o eventos con fecha límite en los próximos 3 días. Si hay alguno, responde con la lista ordenada por urgencia; si no hay nada, responde solo «Sin fechas límite próximas».",
+      "Busca en la memoria y en los calendarios conectados tareas o eventos con fecha límite en los próximos 3 días. Si hay alguno, responde con la lista ordenada por urgencia; si no hay nada, responde solo «Sin fechas límite próximas».",
     schedule: { tipo: "diaria", hora: "09:00" },
   },
   {
     name: "Repaso mensual de finanzas",
     prompt:
-      "Haz el repaso del mes anterior con los paneles de finanzas (gastos, presupuesto) y los objetivos de ahorro de la memoria: desviaciones, logros y 2-3 recomendaciones. Actualiza o crea el gráfico de gastos por categoría.",
+      "Haz el repaso del mes anterior con los extractos y documentos de finanzas de Archivos y los objetivos de ahorro de la memoria: gastos por categoría, desviaciones, logros y 2-3 recomendaciones. Guárdalo en Archivos/Daily como «repaso finanzas AAAA-MM» (mes repasado).",
     schedule: { tipo: "mensual", dia: 1, hora: "09:00" },
   },
 ];

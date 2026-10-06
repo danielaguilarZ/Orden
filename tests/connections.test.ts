@@ -8,10 +8,10 @@ import { buildTools, type ToolDef } from "@/lib/agents/tools";
 import { buildContext, buildSystemPrompt } from "@/lib/agents/prompt";
 import { decryptSecret, encryptSecret, redact } from "@/lib/secrets";
 import { getConnection, getConnectionSecret, grantsForAgent, listConnections, publicConnection, setConnectionSecret, setGrant } from "@/lib/repo/connections";
-import { addConnection, syncDueConnections } from "@/lib/connections";
+import { addConnection } from "@/lib/connections";
+import { getService } from "@/lib/connections/registry";
 import { parseRepo, safeBranch, safePath, setTransportForTests, type GhRequest } from "@/lib/connections/github/api";
-import { statusMarkdown, syncGithubStatus, withoutStamp } from "@/lib/connections/github/status";
-import { archivePanel, getPanel, listVersions } from "@/lib/repo/panels";
+import { statusMarkdown } from "@/lib/connections/github/status";
 import "@/lib/agents/modules";
 import type { Agent } from "@/lib/types";
 
@@ -258,7 +258,7 @@ describe("herramientas de GitHub", () => {
   });
 });
 
-describe("panel «Estado del repo»", () => {
+describe("resumen del repo (sin panel)", () => {
   beforeEach(() => connectGithub());
 
   it("markdown con PRs, issues (sin PRs) y commits", () => {
@@ -278,43 +278,33 @@ describe("panel «Estado del repo»", () => {
     expect(md).toContain("[#3 Arreglar menú móvil]"); // sin corchetes ni barras que rompan el enlace
     expect(md).toContain("`bug`");
     expect(md).toContain("### Últimos commits en `main`");
-    expect(withoutStamp(md)).not.toContain("Actualizado");
+    expect(md.split("\n")[1]).toMatch(/^_Consultado: .+_$/);
   });
 
-  it("se crea, solo guarda versión si cambia algo y respeta la papelera", async () => {
+  it("github_resumen lo da al momento y no crea ningún panel", async () => {
+    const r = await call(marta, "github_resumen", {});
+    expect(r.isError).toBeUndefined();
+    expect(r.content[0].text).toContain("Pull requests abiertos (1)");
+    expect(r.content[0].text).toContain("Tu permiso: lectura");
     const c = listConnections("github")[0];
-    await syncGithubStatus(c, new Date("2026-10-03T18:00:00Z"));
-    const id = getConnection(c.id)!.statusPanelId!;
-    const panel = getPanel(id)!;
-    expect(panel.title).toBe("Estado del repo");
-    expect(panel.type).toBe("notas");
-    expect((panel.data as { markdown: string }).markdown).toContain("Pull requests abiertos (1)");
-
-    await syncGithubStatus(getConnection(c.id)!, new Date("2026-10-03T18:10:00Z"));
-    expect(getPanel(id)!.version).toBe(panel.version); // nada nuevo: no se toca
-
-    pulls = [];
-    await syncGithubStatus(getConnection(c.id)!, new Date("2026-10-03T18:20:00Z"));
-    expect(getPanel(id)!.version).toBe(panel.version + 1);
-    expect((getPanel(id)!.data as { markdown: string }).markdown).toContain("Pull requests abiertos (0)");
-    expect(listVersions(id)[0].actor).toBe("sistema");
-
-    archivePanel(id, { by: "user" });
-    await syncGithubStatus(getConnection(c.id)!);
-    expect(getConnection(c.id)!.config.panel).toBe(false);
-    expect(listConnections("github")).toHaveLength(1);
+    expect(getConnection(c.id)!.statusPanelId).toBeNull();
+    expect("sync" in getService("github")).toBe(false);
   });
 
-  it("el worker sincroniza cada 10 minutos y guarda los errores", async () => {
-    const at = new Date("2026-10-03T18:00:00Z");
-    expect(await syncDueConnections(at)).toHaveLength(1);
-    expect(await syncDueConnections(new Date(at.getTime() + 5 * 60_000))).toHaveLength(0);
+  it("la configuración ya no lleva «panel» y las antiguas siguen contando como duplicadas", () => {
+    const c = listConnections("github")[0];
+    expect(c.config).toEqual({ repo: REPO });
+    getDb().prepare("UPDATE connections SET config = ? WHERE id = ?").run(JSON.stringify({ repo: REPO, panel: true }), c.id);
+    expect(() => addConnection("github", { repo: REPO })).toThrow(/ya existe/);
+  });
+
+  it("los errores no filtran tokens", async () => {
     setTransportForTests(async () => {
       throw new Error("Bad credentials ghp_abcdefghijklmnopqrstuvwxyz1234");
     });
-    await syncDueConnections(new Date(at.getTime() + 11 * 60_000));
-    const err = listConnections("github")[0].lastError!;
-    expect(err).toContain("Bad credentials");
-    expect(err).not.toContain("ghp_");
+    const r = await call(marta, "github_resumen", {});
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain("Bad credentials");
+    expect(r.content[0].text).not.toContain("ghp_");
   });
 });

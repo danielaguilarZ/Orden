@@ -1,27 +1,3 @@
-/* Pestañas de Paneles (Tablero / Archivos) */
-.subtabs {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 9px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-}
-.subtabs a {
-  padding: 4px 12px;
-  border-radius: 7px;
-  color: var(--muted);
-  text-decoration: none;
-  font-weight: 500;
-}
-.subtabs a:hover {
-  color: var(--text);
-}
-.subtabs a.on {
-  background: var(--panel-2);
-  color: var(--accent-2);
-}
-
 /* Archivos */
 .files-layout {
   display: grid;

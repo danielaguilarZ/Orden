@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getService } from "@/lib/connections/registry";
-import { durationMs, expandDays, icsUrl, idPrefix, mergeIcs, occurrences, parseIcs, syncIcs } from "@/lib/connections/ics";
-import { getConnection } from "@/lib/repo/connections";
-import { getPanel, listPanels } from "@/lib/repo/panels";
-import type { CalendarData } from "@/lib/panels/types";
+import { durationMs, expandDays, icsUrl, occurrences, parseIcs } from "@/lib/connections/ics";
 import { callTool, connect, mockFetch, team, textOf, toolNames, useConnTestEnv } from "./helpers/conn";
 
 const URL_ICS = "https://outlook.office365.com/owa/calendar/abc/SECRETO123456/calendar.ics";
@@ -112,37 +109,10 @@ describe("conexión iCal", () => {
     expect(textOf(bad)).not.toContain("SECRETO123456");
   });
 
-  it("vuelca al panel «Calendario» sin duplicar y quita lo borrado", async () => {
-    const c = connect("ics", { nombre: "Trabajo" }, URL_ICS);
-    mockFetch(() => ICS);
-    const at = new Date("2026-10-05T08:00:00Z");
-    await syncIcs(c, at);
-    const panel = listPanels().find((p) => p.title === "Calendario")!;
-    const events = () => (getPanel(panel.id)!.data as CalendarData).events;
-    expect(events().filter((e) => e.id.startsWith(idPrefix(c)))).toHaveLength(5);
-    await syncIcs(getConnection(c.id)!, at);
-    expect(events()).toHaveLength(5);
-    mockFetch(() => ICS.replace(/BEGIN:VEVENT\r\nUID:dentista-1[\s\S]*?END:VEVENT\r\n/, ""));
-    await syncIcs(getConnection(c.id)!, at);
-    expect(events().some((e) => e.title.startsWith("Dentista"))).toBe(false);
-    expect(getConnection(c.id)!.lastError).toBeNull();
-  });
-
-  it("mergeIcs conserva lo hecho a mano y el color", () => {
-    const data: CalendarData = {
-      view: "semana",
-      events: [
-        { id: "manual", title: "A mano", start: "2026-10-06T09:00", allDay: false },
-        { id: "ics_x_1", title: "Viejo", start: "2026-10-06T10:00", allDay: false, color: "#f00" },
-        { id: "ics_x_2", title: "Borrado", start: "2026-10-07T10:00", allDay: false },
-      ],
-    } as CalendarData;
-    const r = mergeIcs(data, [{ id: "ics_x_1", title: "Nuevo", start: "2026-10-06T10:00", allDay: false } as CalendarData["events"][number]], "ics_x_", "2026-10-01", "2026-11-01");
-    expect(r).toMatchObject({ added: 0, updated: 1, removed: 1 });
-    expect(r.data.events.map((e) => [e.id, e.title, e.color])).toEqual([
-      ["manual", "A mano", undefined],
-      ["ics_x_1", "Nuevo", "#f00"],
-    ]);
+  it("no vuelca a ningún panel: solo se consulta y la configuración ya no lleva «panel»", () => {
+    const s = getService("ics");
+    expect("sync" in s).toBe(false);
+    expect(s.normalizeConfig({ nombre: "Trabajo", panel: true })).toEqual({ nombre: "Trabajo" });
   });
 
   it("prueba la conexión", async () => {

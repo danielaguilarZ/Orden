@@ -1,13 +1,6 @@
-import { AppShell } from "@/components/AppShell";
-import { FilesPage } from "@/components/FilesPage";
-import { snapshot } from "@/lib/server";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
-export default function ArchivosPage() {
-  return (
-    <AppShell initial={snapshot()} active="paneles">
-      <FilesPage />
-    </AppShell>
-  );
+/** Archivos ya es una sección propia: la dirección antigua lleva allí. */
+export default function PanelesArchivosPage() {
+  redirect("/archivos");
 }

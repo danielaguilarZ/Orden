@@ -2,10 +2,9 @@ import type { ToolContext, ToolDef } from "../agents/tools";
 import type { Connection, GrantLevel } from "../repo/connections";
 
 /**
- * Catálogo de servicios conectables. Cada servicio (GitHub, y en el futuro
- * otros) declara su configuración, sus herramientas según el nivel de
- * permiso, cómo probar el acceso y, opcionalmente, un panel que se mantiene
- * al día solo. Añadir un servicio = un módulo que llama a `registerService`.
+ * Catálogo de servicios conectables. Cada servicio declara su configuración,
+ * sus herramientas según el nivel de permiso y cómo probar el acceso.
+ * Añadir un servicio = un módulo que llama a `registerService`.
  */
 
 export interface AgentGrant {
@@ -38,9 +37,6 @@ export interface ServiceInfo {
   category?: string;
   /** Icono (emoji) del servicio. */
   icon?: string;
-  /** Tiene panel vivo que se actualiza solo (y su nombre en la ficha). */
-  syncs?: boolean;
-  panelLabel?: string;
 }
 
 /** Estado OAuth que ve la interfaz (sin secretos). */
@@ -61,9 +57,6 @@ export interface ConnectionService extends ServiceInfo {
   prompt(grants: AgentGrant[]): string;
   /** Comprueba el acceso; texto legible para la interfaz. */
   test(connection: Connection): Promise<{ ok: boolean; text: string }>;
-  /** Actualiza su panel vivo (si lo tiene). `false` = no tocaba (no cuenta como actualizado). */
-  sync?(connection: Connection, at?: Date): Promise<void | false>;
-  syncEveryMs?: number;
   /** Estado OAuth para la interfaz (servicios con authKind «oauth»). */
   oauthState?(connection: Connection): OAuthState;
 }
@@ -101,7 +94,5 @@ export function serviceInfo(s: ConnectionService): ServiceInfo {
     secretOptional: Boolean(s.secretOptional),
     category: s.category,
     icon: s.icon,
-    syncs: Boolean(s.sync),
-    panelLabel: s.panelLabel,
   };
 }

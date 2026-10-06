@@ -7,7 +7,7 @@ import { MEMORY_CATEGORIES } from "@/lib/memory/categories";
 import { countByCategory, filterMemory, groupMemory, memoryCategories, type CategoryInfo } from "@/lib/memory/view";
 import { plural, relativeDate, summarize } from "@/lib/ui/text";
 import type { MemoryEntry, MemoryVersion } from "@/lib/repo/memory";
-import { useFresh } from "./panels/common";
+import { useFresh } from "./ui/hooks";
 import { Card, Chip, EmptyState, FilterChips, PageHeader, SearchBox, Section, Toolbar, useToggleSet } from "./ui/kit";
 
 type Draft = { id?: string; category: string; title: string; content: string; tags: string };

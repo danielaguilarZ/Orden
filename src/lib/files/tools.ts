@@ -16,13 +16,14 @@ import {
   type FileNode,
 } from "./repo";
 import { contentVersion, extractCached } from "./read";
-import { formatBytes, nameKey } from "./rules";
+import { formatBytes, nameKey, splitVirtualPath } from "./rules";
 
 /**
  * Herramientas de Archivos para los agentes: lectura (listar, buscar y leer).
  * Quien tiene acceso a todo (el jefe y a quien se le dé) ve también las
- * carpetas privadas; el resto, solo las compartidas. Escritura: solo el jefe y
- * solo archivos de texto dentro de «Daily» (archivo_escribir), sin borrar ni mover.
+ * carpetas privadas; el resto, solo las compartidas. Escritura
+ * (archivo_escribir): solo archivos de texto dentro de «Daily», sin borrar ni
+ * mover. El jefe, en todo «Daily»; los demás, solo en «Daily/<su nombre>».
  */
 
 const MAX_LIST = 400;
@@ -155,21 +156,44 @@ function fileTools(ctx: { agent: Agent; note: (text: string, data?: Record<strin
 
 const MAX_WRITE = 200_000;
 
-/** Escritura en «Daily»: solo para el jefe. */
+/** Carpeta de un agente dentro de «Daily» (su nombre; si no vale como nombre de carpeta, su id corto). */
+export function agentDailyFolder(agent: Pick<Agent, "id" | "name">): string {
+  const name = agent.name.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, "").replace(/[. ]+$/, "");
+  return name && name !== "." && name !== ".." ? name : `agente-${agent.id.slice(0, 8)}`;
+}
+
+/**
+ * Ruta en la que escribe un agente. El jefe, la que diga dentro de «Daily».
+ * Los demás, siempre dentro de «Daily/<su nombre>»: «Daily/informe»,
+ * «informe» o «Daily/<su nombre>/informe» acaban en «Daily/<su nombre>/informe».
+ */
+export function agentWritePath(agent: Pick<Agent, "id" | "name" | "isChief">, ruta: string): string {
+  if (agent.isChief) return ruta;
+  const own = agentDailyFolder(agent);
+  const parts = splitVirtualPath(ruta);
+  if (parts.length && nameKey(parts[0]) === nameKey(DAILY_FOLDER)) parts.shift();
+  if (parts.length && nameKey(parts[0]) === nameKey(own)) parts.shift();
+  if (!parts.length) throw new Error(`Falta el nombre del archivo (p. ej. «${DAILY_FOLDER}/${own}/informe ${new Date().toISOString().slice(0, 10)}»).`);
+  return [DAILY_FOLDER, own, ...parts].join("/");
+}
+
+/** Escritura de texto en «Daily» (el jefe, en toda la carpeta; los demás, en la suya). */
 function writeTools(ctx: { agent: Agent; note: (text: string, data?: Record<string, unknown>) => void }): ToolDef[] {
   const { agent } = ctx;
+  const where = agent.isChief ? `la carpeta «${DAILY_FOLDER}»` : `tu carpeta «${DAILY_FOLDER}/${agentDailyFolder(agent)}»`;
+  const example = agent.isChief ? `${DAILY_FOLDER}/resumen 2026-10-04` : `${DAILY_FOLDER}/${agentDailyFolder(agent)}/informe 2026-10-04`;
   return [
     defineTool(
       "archivo_escribir",
-      `Crea o actualiza un archivo de texto (.md o .txt) dentro de la carpeta «${DAILY_FOLDER}» de Archivos (o sus subcarpetas); crea las carpetas que falten. Si ya existe, lo sustituye (o añade al final con anadir:true). Fuera de «${DAILY_FOLDER}» no se puede escribir, ni borrar ni mover nada.`,
+      `Crea o actualiza un archivo de texto (.md o .txt) dentro de ${where} de Archivos (o sus subcarpetas); crea las carpetas que falten. Si ya existe, lo sustituye (o añade al final con anadir:true). Fuera de ahí no se puede escribir, ni borrar ni mover nada.`,
       {
-        ruta: z.string().min(1).describe(`Ruta del archivo, p. ej. «${DAILY_FOLDER}/resumen 2026-10-04» (sin extensión se guarda como .md)`),
+        ruta: z.string().min(1).describe(`Ruta del archivo, p. ej. «${example}» (sin extensión se guarda como .md)`),
         contenido: z.string().min(1).max(MAX_WRITE).describe("Texto o markdown"),
         anadir: z.boolean().optional().describe("true = añadir al final en vez de sustituir"),
       },
       async ({ ruta, contenido, anadir }) => {
         try {
-          const r = writeDailyFile({ path: ruta, content: contenido, append: anadir ?? false, by: agent.id });
+          const r = writeDailyFile({ path: agentWritePath(agent, ruta), content: contenido, append: anadir ?? false, by: agent.id });
           const verb = r.created ? "creado" : anadir ? "añadido texto a" : "actualizado";
           ctx.note(`Ha ${verb} «${r.path}»`, { kind: "file", fileId: r.node.id });
           logActivity("archivos", `${agent.name} ha ${verb} «${r.path}»`, agent.id, { fileId: r.node.id });
@@ -184,21 +208,23 @@ function writeTools(ctx: { agent: Agent; note: (text: string, data?: Record<stri
 
 registerTools((ctx) => {
   if (ctx.task.kind === "ambient") return [];
-  if (ctx.agent.isChief) return [...fileTools(ctx), ...writeTools(ctx)];
-  // Sin acceso a todo y sin carpetas compartidas no hay nada que ver: no se gastan tokens en herramientas.
-  if (fileAccessOf(ctx.agent) !== "todo" && !hasSharedFolders()) return [];
-  return fileTools(ctx);
+  // Sin acceso a todo y sin carpetas compartidas no hay nada que leer: solo la escritura en su carpeta de «Daily».
+  if (!ctx.agent.isChief && fileAccessOf(ctx.agent) !== "todo" && !hasSharedFolders()) return writeTools(ctx);
+  return [...fileTools(ctx), ...writeTools(ctx)];
 });
 
 registerPromptSection((agent) => {
   const access = fileAccessOf(agent);
-  if (access !== "todo" && !hasSharedFolders()) return null;
-  return `Archivos (sección de Paneles): el usuario sube documentos (PDF, CSV, XLSX, imágenes, texto) organizados en carpetas.
-- Tu acceso: ${access === "todo" ? "todo, incluidas las carpetas privadas (finanzas y personales)" : "solo las carpetas compartidas; las privadas no las ves"}. ${
-    agent.isChief
-      ? `Solo lectura, salvo la carpeta «${DAILY_FOLDER}»: ahí puedes crear o actualizar archivos de texto/markdown con archivo_escribir (p. ej. «${DAILY_FOLDER}/resumen AAAA-MM-DD»). Nunca puedes borrar ni mover.`
-      : "Solo lectura: no puedes subir, mover ni borrar."
+  const canRead = access === "todo" || hasSharedFolders();
+  const write = agent.isChief
+    ? `Puedes crear o actualizar archivos de texto/markdown en la carpeta «${DAILY_FOLDER}» con archivo_escribir (p. ej. «${DAILY_FOLDER}/resumen AAAA-MM-DD»).`
+    : `Puedes crear o actualizar archivos de texto/markdown en tu carpeta «${DAILY_FOLDER}/${agentDailyFolder(agent)}» con archivo_escribir (p. ej. informes de tus rutinas).`;
+  return `Archivos: el usuario sube documentos (PDF, CSV, XLSX, imágenes, texto) organizados en carpetas. Es donde se guarda lo que tenga que quedar por escrito (no hay paneles).
+- ${write} Nunca puedes borrar ni mover nada.
+- ${
+    canRead
+      ? `Tu acceso de lectura: ${access === "todo" ? "todo, incluidas las carpetas privadas (finanzas y personales)" : "solo las carpetas compartidas; las privadas no las ves"}. Usa archivos_listar o archivos_buscar para encontrarlos y archivo_leer para leerlos (extrae el texto de los PDF y las filas de CSV/XLSX).`
+      : "No tienes acceso de lectura a ninguna carpeta."
   }
-- Usa archivos_listar o archivos_buscar para encontrarlos y archivo_leer para leerlos (extrae el texto de los PDF y las filas de CSV/XLSX).
-- Son datos personales: usa solo lo necesario y no copies números de cuenta, DNI o similares completos a paneles o a la memoria.`;
+- Son datos personales: usa solo lo necesario y no copies números de cuenta, DNI o similares completos a archivos o a la memoria.`;
 });

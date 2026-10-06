@@ -1,6 +1,6 @@
 /**
  * Fechas en la zona horaria del usuario (Europe/Madrid por defecto) sin
- * dependencias: los paneles de calendario guardan hora local «flotante»
+ * dependencias: los agentes hablan en hora local «flotante»
  * (AAAA-MM-DDTHH:MM) y Google trabaja con instantes RFC 3339.
  */
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Pixelify_Sans } from "next/font/google";
 import "./globals.css";
 import "./team.css";
-import "./panels.css";
+import "./base.css";
 import "./memory.css";
 import "./routines.css";
 import "./connections.css";

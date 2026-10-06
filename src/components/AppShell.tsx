@@ -9,7 +9,7 @@ import { ConnectClaudeDialog } from "./ConnectClaudeDialog";
 
 const NAV = [
   { key: "living", href: "/", label: "Living" },
-  { key: "paneles", href: "/paneles", label: "Paneles" },
+  { key: "archivos", href: "/archivos", label: "Archivos" },
   { key: "memoria", href: "/memoria", label: "Memoria" },
   { key: "actividad", href: "/actividad", label: "Actividad" },
   { key: "conexiones", href: "/conexiones", label: "Conexiones" },

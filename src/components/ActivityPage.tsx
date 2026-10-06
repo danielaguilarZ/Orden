@@ -7,7 +7,7 @@ import type { Routine } from "@/lib/repo/routines";
 import { describeSchedule } from "@/lib/routines/schedule";
 import { dayLabel, groupByDay, timeOf, whenLabel } from "@/lib/ui/text";
 import { AvatarPreview } from "./AvatarPreview";
-import { useMounted } from "./panels/common";
+import { useMounted } from "./ui/hooks";
 import { Chip, EmptyState, FilterChips, PageHeader, Section, Toolbar } from "./ui/kit";
 
 const KINDS: Record<string, { label: string; icon: string }> = {

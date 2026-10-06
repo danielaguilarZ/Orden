@@ -8,7 +8,6 @@ import { skyAt, skyCssVars, type Sky } from "@/living/sky";
 import { AgentDrawer, STATUS_LABEL } from "./AgentDrawer";
 import { AgentForm } from "./AgentForm";
 import { AvatarPreview } from "./AvatarPreview";
-import { LivePanelDock } from "./LivePanelDock";
 import { RoomEditor } from "./RoomEditor";
 
 /** Living isométrico. PixiJS solo se carga en el navegador. */
@@ -175,7 +174,6 @@ export function LivingView() {
             </span>
           )}
         </div>
-        <LivePanelDock />
         <ul className="legend">
           <li data-status="working">Trabajando</li>
           <li data-status="waiting">Esperando</li>

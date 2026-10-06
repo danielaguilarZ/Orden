@@ -1,6 +1,5 @@
 import { registerService, type AgentGrant } from "../registry";
 import { ghStatus, parseRepo, RepoApi, resolveTransport } from "./api";
-import { SYNC_EVERY_MS, syncGithubStatus } from "./status";
 import { githubTools } from "./tools";
 import { redact } from "../../secrets";
 
@@ -18,7 +17,7 @@ registerService({
   supportsSecret: true,
 
   normalizeConfig(input) {
-    return { repo: parseRepo(input.repo).full, panel: input.panel !== false };
+    return { repo: parseRepo(input.repo).full };
   },
   defaultName(config) {
     return `GitHub · ${String(config.repo)}`;
@@ -45,6 +44,4 @@ ${grants.map((g) => `- Repo ${String(g.connection.config.repo)} · tu permiso: $
       return { ok: false, text: redact((err as Error).message) };
     }
   },
-  sync: syncGithubStatus,
-  syncEveryMs: SYNC_EVERY_MS,
 });

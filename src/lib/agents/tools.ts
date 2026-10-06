@@ -40,7 +40,7 @@ export function defineTool<S extends z.ZodRawShape>(
 export type ToolFactory = (ctx: ToolContext) => ToolDef[];
 
 const factories: ToolFactory[] = [];
-/** Otros módulos (paneles, memoria…) añaden sus herramientas aquí. */
+/** Otros módulos (memoria, archivos…) añaden sus herramientas aquí. */
 export function registerTools(factory: ToolFactory) {
   factories.push(factory);
 }

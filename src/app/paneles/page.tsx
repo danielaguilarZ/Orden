@@ -1,14 +1,6 @@
-import { AppShell } from "@/components/AppShell";
-import { PanelsBoard } from "@/components/PanelsBoard";
-import { snapshot } from "@/lib/server";
-import "../panels-simple.css";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
+/** Los paneles se quitaron de Orden (sus datos siguen en la base de datos): queda Archivos. */
 export default function PanelesPage() {
-  return (
-    <AppShell initial={snapshot()} active="paneles">
-      <PanelsBoard />
-    </AppShell>
-  );
+  redirect("/archivos");
 }
