@@ -19,3 +19,4 @@ import "./homeassistant";
 import "./ics";
 import "./crypto";
 import "./stocks";
+import "./fx";
