@@ -21,3 +21,4 @@ import "./crypto";
 import "./stocks";
 import "./fx";
 import "./readwise";
+import "./raindrop";
