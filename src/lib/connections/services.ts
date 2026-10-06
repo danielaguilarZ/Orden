@@ -11,3 +11,4 @@ import "./notion";
 import "./todoist";
 import "./trello";
 import "./linear";
+import "./discord";
