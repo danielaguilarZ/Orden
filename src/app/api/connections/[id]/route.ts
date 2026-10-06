@@ -1,9 +1,8 @@
 import { route, body, type IdCtx } from "@/lib/http";
-import { connectionView, editConnectionConfig, syncConnectionNow } from "@/lib/connections";
+import { connectionView, editConnectionConfig } from "@/lib/connections";
 import { getService } from "@/lib/connections/registry";
 import { disconnect, redirectUriFor, saveClient, startAuth } from "@/lib/connections/google/api";
 import { getAgent } from "@/lib/repo/agents";
-import { getPanel } from "@/lib/repo/panels";
 import { logActivity } from "@/lib/repo/system";
 import {
   AUTH_MODES,
@@ -76,8 +75,8 @@ export const DELETE = route<IdCtx>(async (_req, { params }) => {
 });
 
 /**
- * Acciones: «probar» el acceso, «actualizar» su panel ahora y, en OAuth,
- * «autorizar» (devuelve la URL de Google) o «desconectar».
+ * Acciones: «probar» el acceso y, en OAuth, «autorizar» (devuelve la URL de
+ * Google) o «desconectar».
  */
 export const POST = route<IdCtx>(async (req, { params }) => {
   const { id } = await params;
@@ -94,17 +93,6 @@ export const POST = route<IdCtx>(async (req, { params }) => {
     await disconnect(id);
     logActivity("sistema", `Autorización de «${c.name}» retirada (y revocada en Google)`);
     return { ok: true, text: "Autorización retirada." };
-  }
-  if (accion === "actualizar") {
-    // Si estaba desactivado o en la papelera, se reactiva con un panel nuevo.
-    if (c.config.panel === false) editConnectionConfig(id, { panel: true });
-    if (c.statusPanelId && getPanel(c.statusPanelId)?.archived) updateConnection(id, { statusPanelId: null });
-    try {
-      await syncConnectionNow(id);
-      return { ok: true, text: service.authKind === "oauth" ? "Calendario volcado." : "Panel actualizado." };
-    } catch (err) {
-      return { ok: false, text: (err as Error).message };
-    }
   }
   throw new Error("Acción desconocida.");
 });

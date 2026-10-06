@@ -3,7 +3,6 @@
 import { useSyncExternalStore } from "react";
 import type { Agent, AgentStatus, FurnitureItem, HeartbeatInfo, OrdenEvent, Room, RoomStyle } from "@/lib/types";
 import type { ClaudeStatus } from "@/lib/claude/auth";
-import type { Panel } from "@/lib/repo/panels";
 import type { ClaudeUsage } from "@/lib/claude/usageText";
 
 /**
@@ -13,12 +12,9 @@ import type { ClaudeUsage } from "@/lib/claude/usageText";
 export interface ClientState {
   agents: Agent[];
   rooms: Room[];
-  panels: Panel[];
   usage: ClaudeUsage | null;
   /** Decisiones pendientes de responder (contador de la pestaña). */
   decisionsPending: number;
-  /** Último panel que tocó un agente (para el panel en vivo del living). */
-  livePanel: { panelId: string; agentId: string; at: number } | null;
   worker: HeartbeatInfo | null;
   claude: ClaudeStatus | null;
   live: boolean;
@@ -32,7 +28,7 @@ export interface ClientState {
 type Listener = () => void;
 type EventHandler = (e: OrdenEvent) => void;
 
-let state: ClientState = { agents: [], rooms: [], panels: [], usage: null, decisionsPending: 0, livePanel: null, worker: null, claude: null, live: false, restarting: null, lastEventId: 0, roomEdit: null };
+let state: ClientState = { agents: [], rooms: [], usage: null, decisionsPending: 0, worker: null, claude: null, live: false, restarting: null, lastEventId: 0, roomEdit: null };
 const listeners = new Set<Listener>();
 const eventHandlers = new Set<EventHandler>();
 
@@ -58,7 +54,7 @@ export function useStore<T>(selector: (s: ClientState) => T): T {
   );
 }
 
-/** Suscribirse a todos los eventos en bruto (para paneles, chat…). */
+/** Suscribirse a todos los eventos en bruto (para archivos, chat…). */
 export function onEvent(handler: EventHandler): () => void {
   eventHandlers.add(handler);
   return () => {
@@ -69,7 +65,6 @@ export function onEvent(handler: EventHandler): () => void {
 export function hydrate(init: {
   agents: Agent[];
   rooms: Room[];
-  panels: Panel[];
   usage: ClaudeUsage | null;
   system: { worker: HeartbeatInfo | null };
   decisionsPending?: number;
@@ -79,25 +74,11 @@ export function hydrate(init: {
   set({
     agents: init.agents,
     rooms: init.rooms,
-    panels: init.panels,
     usage: init.usage,
     worker: init.system.worker,
     decisionsPending: init.decisionsPending ?? 0,
     lastEventId: init.lastEventId,
   });
-}
-
-function sortPanels(list: Panel[]) {
-  return list.slice().sort((a, b) => (a.layout.order ?? 1e9) - (b.layout.order ?? 1e9) || b.updatedAt.localeCompare(a.updatedAt));
-}
-
-/** Cambio local inmediato de un panel (la confirmación llega por SSE). */
-export function patchPanelLocal(panel: Panel) {
-  set({ panels: sortPanels(upsert(state.panels, panel)) });
-}
-
-export function closeLivePanel() {
-  set({ livePanel: null });
 }
 
 /** Abre el editor de una sala (o lo cierra con null). `rename`: empieza editando el nombre. */
@@ -154,29 +135,6 @@ function apply(e: OrdenEvent) {
     case "room.updated":
       set({ rooms: upsert(state.rooms, p as unknown as Room) });
       break;
-    case "panel.created":
-    case "panel.updated":
-    case "panel.layout": {
-      const panel = (p as { panel: Panel }).panel;
-      const actor = (p as { actor?: { by: string } }).actor;
-      set({
-        panels: panel.archived ? state.panels.filter((x) => x.id !== panel.id) : sortPanels(upsert(state.panels, panel)),
-        // Las actualizaciones automáticas («sistema», p. ej. Conexiones) no abren la ventana flotante.
-        ...(actor && actor.by !== "user" && actor.by !== "sistema" && { livePanel: { panelId: panel.id, agentId: actor.by, at: Date.now() } }),
-      });
-      break;
-    }
-    case "panel.archived":
-      set({ panels: state.panels.filter((x) => x.id !== (p as { panel: Panel }).panel.id) });
-      break;
-    case "panel.deleted":
-      set({ panels: state.panels.filter((x) => x.id !== p.id) });
-      break;
-    case "panel.reordered": {
-      const ids = p.ids as string[];
-      set({ panels: sortPanels(state.panels.map((x) => ({ ...x, layout: { ...x.layout, order: ids.indexOf(x.id) < 0 ? 1e6 : ids.indexOf(x.id) } }))) });
-      break;
-    }
     case "system.restarting":
       set({ restarting: String(p.reason ?? "Actualización") });
       break;
