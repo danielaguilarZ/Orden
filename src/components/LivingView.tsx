@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, onEvent, openRoomEditor, useStore } from "@/client/store";
+import { api, onEvent, openDecor, useStore } from "@/client/store";
 import type { LivingScene } from "@/living/scene";
 import { currentRoom } from "@/living/presence";
 import { skyAt, skyCssVars, type Sky } from "@/living/sky";
 import { AgentDrawer, STATUS_LABEL } from "./AgentDrawer";
 import { AgentForm } from "./AgentForm";
 import { AvatarPreview } from "./AvatarPreview";
-import { RoomEditor } from "./RoomEditor";
+import { DecorMode } from "./DecorMode";
 
 /** Living isométrico. PixiJS solo se carga en el navegador. */
 export function LivingView() {
@@ -59,7 +59,7 @@ export function LivingView() {
     };
   }, []);
 
-  // Con el editor de sala abierto, el living pinta el borrador (aún sin guardar).
+  // En el modo decorar, el living pinta el borrador (aún sin guardar).
   const shownRooms = useMemo(
     () =>
       roomEdit?.furniture || roomEdit?.style
@@ -102,10 +102,15 @@ export function LivingView() {
   }
 
   const agent = agents.find((a) => a.id === selected) ?? null;
+  const decorating = Boolean(roomEdit);
 
   return (
     <div className="living">
-      <div className="living-stage" data-sky={sky?.phase} style={sky ? (skyCssVars(sky) as React.CSSProperties) : undefined}>
+      <div
+        className={`living-stage${decorating ? " decorating" : ""}`}
+        data-sky={sky?.phase}
+        style={sky ? (skyCssVars(sky) as React.CSSProperties) : undefined}
+      >
         <div className="living-sky" aria-hidden>
           <div className="sky-stars" />
           <div className="sky-glow" />
@@ -113,6 +118,7 @@ export function LivingView() {
         <div ref={hostRef} className="living-canvas" />
         <div ref={overlayRef} className="living-overlay" />
         {!ready && <div className="living-loading">Abriendo la casa…</div>}
+        {roomEdit && <DecorMode roomId={roomEdit.roomId} scene={ready ? sceneRef.current : null} />}
 
         <section className="roster">
           <header>
@@ -162,10 +168,10 @@ export function LivingView() {
           {!roomEdit && rooms.length > 0 && (
             <button
               className="btn ghost small"
-              title="Elige tú dónde va cada mueble"
-              onClick={() => openRoomEditor((agent ? currentRoom(agent, rooms) : undefined)?.id ?? rooms[0].id)}
+              title="Modo decorar: arrastra los muebles en la propia sala"
+              onClick={() => openDecor((agent ? currentRoom(agent, rooms) : undefined)?.id ?? rooms[0].id)}
             >
-              Editar sala
+              Decorar
             </button>
           )}
           {sky && (
@@ -181,7 +187,7 @@ export function LivingView() {
           <li data-status="error">Error</li>
         </ul>
       </div>
-      {roomEdit ? <RoomEditor roomId={roomEdit.roomId} /> : agent && <AgentDrawer agent={agent} onClose={() => setSelected(null)} />}
+      {!roomEdit && agent && <AgentDrawer agent={agent} onClose={() => setSelected(null)} />}
       {adding && <AgentForm onClose={() => setAdding(false)} onSaved={(a) => setSelected(a.id)} />}
     </div>
   );

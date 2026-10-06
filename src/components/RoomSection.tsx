@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api, openRoomEditor, useStore } from "@/client/store";
+import { api, openDecor, useStore } from "@/client/store";
 import { FURNITURE } from "@/living/furniture";
 import { currentRoom, furnitureSummary, roomOwnerLabel, roomRelation } from "@/living/presence";
 import type { Agent } from "@/lib/types";
@@ -89,8 +89,8 @@ export function RoomSection({ agent }: { agent: Agent }) {
         </button>
       </div>
       <div className="row">
-        <button className="btn small" title="Elige tú dónde va cada mueble: arrastrar, girar y quitar" onClick={() => openRoomEditor(room.id)}>
-          Colocar muebles a mano
+        <button className="btn small" title="Modo decorar en la propia sala: arrastrar, girar, duplicar y quitar" onClick={() => openDecor(room.id)}>
+          Decorar a mano
         </button>
       </div>
       <p className="muted small">Lo nuevo se coloca solo en un hueco libre, sin mover lo que ya está.</p>
