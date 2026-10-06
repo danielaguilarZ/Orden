@@ -32,6 +32,15 @@ export interface ServiceInfo {
   /** Nombre y ejemplo de la credencial (si usa token). */
   secretLabel?: string;
   secretPlaceholder?: string;
+  /** La credencial es opcional (p. ej. ntfy en un tema público). */
+  secretOptional?: boolean;
+  /** Categoría del catálogo (ver CATEGORIES en catalog.ts). */
+  category?: string;
+  /** Icono (emoji) del servicio. */
+  icon?: string;
+  /** Tiene panel vivo que se actualiza solo (y su nombre en la ficha). */
+  syncs?: boolean;
+  panelLabel?: string;
 }
 
 /** Estado OAuth que ve la interfaz (sin secretos). */
@@ -89,5 +98,10 @@ export function serviceInfo(s: ConnectionService): ServiceInfo {
     steps: s.steps ?? [],
     secretLabel: s.secretLabel,
     secretPlaceholder: s.secretPlaceholder,
+    secretOptional: Boolean(s.secretOptional),
+    category: s.category,
+    icon: s.icon,
+    syncs: Boolean(s.sync),
+    panelLabel: s.panelLabel,
   };
 }
