@@ -16,7 +16,7 @@ import {
 } from "@/lib/decisions/labels";
 import { hasMore, relativeDate, summarize } from "@/lib/ui/text";
 import { Markdown } from "./Markdown";
-import { useMounted } from "./panels/common";
+import { useMounted } from "./ui/hooks";
 import { Chip, EmptyState, PageHeader, Section, useToggleSet } from "./ui/kit";
 
 const POSTPONE: { days: number; label: string }[] = [
