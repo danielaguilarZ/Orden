@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getDb, now, tx } from "../db";
 import { emit } from "../events";
-import type { Actor } from "./panels";
+import type { Actor } from "../types";
 
 export { MEMORY_CATEGORIES } from "../memory/categories";
 

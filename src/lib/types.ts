@@ -106,6 +106,12 @@ export interface OrdenEvent<T = unknown> {
   createdAt: string;
 }
 
+/** Quién hace un cambio guardado con historial: el usuario, el sistema o un agente dentro de un encargo. */
+export interface Actor {
+  by: string; // "user", "sistema" o id del agente
+  taskId?: string | null;
+}
+
 export interface HeartbeatInfo {
   name: string;
   at: string;
