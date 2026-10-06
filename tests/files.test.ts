@@ -38,7 +38,7 @@ import {
 import { checkContent, cleanName, contentDisposition, isInside, nameKey, splitVirtualPath, uniqueName } from "@/lib/files/rules";
 import { decodeText, excelDate, extractText, parseCsv, parseXlsx } from "@/lib/files/read";
 import { extractPdfText, hash2B } from "@/lib/files/pdf";
-import { readForAgent } from "@/lib/files/tools";
+import { agentDailyFolder, agentWritePath, readForAgent } from "@/lib/files/tools";
 import { readBodyLimited } from "@/lib/files/upload";
 import "@/lib/agents/modules";
 import type { Agent } from "@/lib/types";
@@ -486,15 +486,17 @@ describe("herramientas de los agentes y privacidad", () => {
     nomina = pdfIn("Finanzas/Nóminas", "nomina-2026-09.pdf");
   });
 
-  it("Ana y Zen las tienen; el resto no, mientras no haya carpetas compartidas", () => {
+  it("Ana y Zen leen; el resto solo escribe en su carpeta de Daily mientras no haya carpetas compartidas", () => {
     const all = ["archivo_leer", "archivos_buscar", "archivos_listar"];
-    expect(fileToolNames(ana)).toEqual(all);
+    expect(fileToolNames(ana)).toEqual(["archivo_escribir", ...all]);
     expect(fileToolNames(getChief()!)).toEqual(["archivo_escribir", ...all]);
-    expect(fileToolNames(leo)).toEqual([]);
+    expect(fileToolNames(leo)).toEqual(["archivo_escribir"]);
     expect(buildSystemPrompt(ana, createTask({ agentId: ana.id, kind: "chat", prompt: "x" }))).toContain("incluidas las carpetas privadas");
-    expect(buildSystemPrompt(leo, createTask({ agentId: leo.id, kind: "chat", prompt: "x" }))).not.toContain("archivo_leer");
+    const leoPrompt = buildSystemPrompt(leo, createTask({ agentId: leo.id, kind: "chat", prompt: "x" }));
+    expect(leoPrompt).not.toContain("archivo_leer");
+    expect(leoPrompt).toContain("«Daily/Leo»");
     createFolder({ parentId: null, name: "Compartido", private: false });
-    expect(fileToolNames(leo)).toEqual(all);
+    expect(fileToolNames(leo)).toEqual(["archivo_escribir", ...all]);
   });
 
   it("Ana lista, busca y lee una nómina (queda en Actividad)", async () => {
@@ -587,11 +589,34 @@ describe("escritura en «Daily»", () => {
     expect(() => writeDailyFile({ path: "Daily/resumen 2026-10-04.md/x", content: "x" })).toThrow(/es un archivo/);
   });
 
-  it("solo Zen tiene archivo_escribir; fuera de Daily falla y no toca nada; queda en Actividad", async () => {
+  it("los demás agentes solo escriben en «Daily/<su nombre>» (no pueden salir de ahí)", async () => {
     const zen = getChief()!;
-    for (const a of [ana, leo, gwen]) expect(toolsOf(a).some((t) => t.name === "archivo_escribir")).toBe(false);
+    expect(agentWritePath(zen, "Daily/resumen")).toBe("Daily/resumen");
+    expect(agentWritePath(leo, "Daily/informe")).toBe("Daily/Leo/informe");
+    expect(agentWritePath(leo, "informe")).toBe("Daily/Leo/informe");
+    expect(agentWritePath(leo, "daily/LEO/2026/informe")).toBe("Daily/Leo/2026/informe");
+    expect(agentWritePath(leo, "Finanzas/Nóminas/x.md")).toBe("Daily/Leo/Finanzas/Nóminas/x.md");
+    expect(() => agentWritePath(leo, "Daily/../Finanzas/x.md")).toThrow();
+    expect(() => agentWritePath(leo, "Daily/Leo")).toThrow(/Falta el nombre/);
+    expect(agentDailyFolder({ id: "abcdef1234", name: "  " })).toBe("agente-abcdef12");
+
+    const r = await call(leo, "archivo_escribir", { ruta: "Daily/informe 2026-10-06", contenido: "# Informe\nTodo en orden" });
+    expect(r.isError).toBeUndefined();
+    expect(r.content[0].text).toContain("creado «Daily/Leo/informe 2026-10-06.md»");
+    expect(readForAgent("todo", "Daily/Leo/informe 2026-10-06.md").text).toContain("Todo en orden");
+    // No pisa lo de Zen ni sale de su carpeta.
+    writeDailyFile({ path: "Daily/resumen 2026-10-06", content: "de Zen", by: zen.id });
+    await call(leo, "archivo_escribir", { ruta: "Daily/resumen 2026-10-06", contenido: "de Leo" });
+    expect(readForAgent("todo", "Daily/resumen 2026-10-06.md").text).toContain("de Zen");
+    expect(readForAgent("todo", "Daily/Leo/resumen 2026-10-06.md").text).toContain("de Leo");
+    expect((await call(leo, "archivo_escribir", { ruta: "Daily/x.pdf", contenido: "x" })).isError).toBe(true);
+  });
+
+  it("Zen escribe en todo Daily; fuera de Daily falla y no toca nada; queda en Actividad", async () => {
+    const zen = getChief()!;
+    for (const a of [ana, leo, gwen]) expect(toolsOf(a).some((t) => t.name === "archivo_escribir")).toBe(true);
     expect(buildSystemPrompt(zen, createTask({ agentId: zen.id, kind: "chat", prompt: "x" }))).toContain("archivo_escribir");
-    expect(buildSystemPrompt(ana, createTask({ agentId: ana.id, kind: "chat", prompt: "x" }))).not.toContain("archivo_escribir");
+    expect(buildSystemPrompt(ana, createTask({ agentId: ana.id, kind: "chat", prompt: "x" }))).toContain("«Daily/Ana»");
 
     const before = listLiveNodes().length;
     for (const ruta of ["Finanzas/Nóminas/hack.md", "resumen.md", "Daily/../Finanzas/x.md", "Daily/x.pdf"]) {
