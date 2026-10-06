@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, onEvent, useStore } from "@/client/store";
 import type { FileNode } from "@/lib/files/repo";
 import { Backdrop } from "./Backdrop";
-import { PanelsTabs } from "./PanelsTabs";
 
 /**
  * Archivos: árbol de carpetas a la izquierda y el contenido de la carpeta
@@ -224,8 +223,7 @@ export function FilesPage() {
   return (
     <div className="board files">
       <div className="board-bar">
-        <h1>Paneles</h1>
-        <PanelsTabs active="archivos" />
+        <h1>Archivos</h1>
         <span className="muted">Tus documentos, en carpetas. Los agentes con permiso pueden leerlos.</span>
         <span style={{ flex: 1 }} />
         <button className="btn ghost" onClick={() => setModal({ type: "permisos" })}>
@@ -650,8 +648,9 @@ function AccessModal({ fullAccess, onClose, onChange }: { fullAccess: string[]; 
           </button>
         </header>
         <p className="muted small">
-          Los agentes solo pueden <strong>leer</strong> (listar, buscar y leer el contenido). Con «acceso a todo» ven también las carpetas privadas; el resto
-          solo ve las carpetas compartidas. Las carpetas nuevas de primer nivel empiezan privadas.
+          Los agentes <strong>leen</strong> (listar, buscar y leer el contenido) y solo <strong>escriben</strong> texto en «Daily»: Zen en toda la carpeta y cada
+          agente en «Daily/su nombre». Nunca borran ni mueven. Con «acceso a todo» ven también las carpetas privadas; el resto solo ve las carpetas
+          compartidas. Las carpetas nuevas de primer nivel empiezan privadas.
         </p>
         {error && <p className="bad-text">{error}</p>}
         <table className="conn-grants">
