@@ -6,9 +6,10 @@ import type { ServiceInfo } from "@/lib/connections/registry";
 import { UPCOMING_SERVICES } from "@/lib/connections/catalog";
 import { catalogItems, categoryCounts, connectionStatus, grantCount, groupCatalog, serviceIcon, type CatalogFilter, type CatalogItem, type ConnView } from "@/lib/connections/view";
 import type { AuthMode, GrantLevel } from "@/lib/repo/connections";
-import { useMounted } from "./panels/common";
-import { MoreMenu, type MenuItem } from "./panels/MoreMenu";
+import { MoreMenu, type MenuItem } from "./ui/MoreMenu";
 import { FilterChips, SearchBox } from "./ui/kit";
+
+type Accion = "probar" | "autorizar" | "desconectar";
 
 interface Data {
   services: ServiceInfo[];
@@ -84,7 +85,6 @@ function ConnectionRow({ conn, service, onChange }: { conn: ConnView; service?: 
   const oauth = service?.authKind === "oauth";
   const status = connectionStatus(conn, service);
   const granted = grantCount(conn);
-  const syncs = oauth || conn.service === "github" || Boolean(service?.syncs);
   const toggle = (k: "ajustes" | "permisos") => setOpen(open === k ? "" : k);
 
   const patch = async (b: Record<string, unknown>) => {
@@ -96,7 +96,7 @@ function ConnectionRow({ conn, service, onChange }: { conn: ConnView; service?: 
       setResult({ ok: false, text: (e as Error).message });
     }
   };
-  const action = async (accion: "probar" | "actualizar" | "autorizar" | "desconectar") => {
+  const action = async (accion: Accion) => {
     if (accion === "desconectar" && !confirm("¿Retirar la autorización de Google? Los agentes dejarán de ver el calendario.")) return;
     setBusy(accion);
     setResult(null);
@@ -141,7 +141,6 @@ function ConnectionRow({ conn, service, onChange }: { conn: ConnView; service?: 
     { label: open === "ajustes" ? "Ocultar ajustes" : "Ajustes", onClick: () => toggle("ajustes") },
     { label: open === "permisos" ? "Ocultar permisos" : "Permisos de agentes", onClick: () => toggle("permisos") },
     ...(status.needsSetup || (oauth && !conn.oauth?.authorized) ? [{ label: "Probar conexión", onClick: () => action("probar"), disabled: busy !== "" }] : []),
-    ...(syncs ? [{ label: oauth ? "Volcar ahora" : "Actualizar ahora", onClick: () => action("actualizar"), disabled: busy !== "" || (oauth && !conn.oauth?.authorized) }] : []),
     ...(oauth && conn.oauth?.authorized ? [{ label: "Volver a autorizar", onClick: () => action("autorizar"), disabled: busy !== "" }] : []),
     { label: conn.enabled ? "Pausar" : "Activar", onClick: () => patch({ enabled: !conn.enabled }) },
     ...(oauth && conn.oauth?.authorized ? [{ label: "Desconectar Google", onClick: () => action("desconectar"), danger: true }] : []),
@@ -189,16 +188,13 @@ function ConnectionSettings({
   /** Falta configurarla: los pasos salen desplegados. */
   showSteps: boolean;
   patch: (b: Record<string, unknown>) => Promise<void>;
-  action: (a: "probar" | "actualizar" | "autorizar" | "desconectar") => Promise<void>;
+  action: (a: Accion) => Promise<void>;
 }) {
-  const mounted = useMounted();
   const [token, setToken] = useState("");
   const [client, setClient] = useState({ clientId: "", clientSecret: "" });
   const [config, setConfig] = useState<Record<string, string>>(() => Object.fromEntries((service?.fields ?? []).map((f) => [f.key, fieldText(conn.config[f.key])])));
   const oauth = service?.authKind === "oauth";
-  const hasPanel = oauth || conn.service === "github" || Boolean(service?.panelLabel);
   const dirty = (service?.fields ?? []).some((f) => config[f.key] !== fieldText(conn.config[f.key]));
-  const lastSync = conn.lastSyncAt && mounted ? new Date(conn.lastSyncAt).toLocaleString("es-ES") : "nunca";
 
   return (
     <div className="conn-body">
@@ -310,24 +306,7 @@ function ConnectionSettings({
         </div>
       )}
 
-      {hasPanel && (
-        <div className="conn-field">
-          <span>{service?.panelLabel ?? (oauth ? "Panel «Calendario»" : "Panel «Estado del repo»")}</span>
-          <span className="conn-token">
-            <label
-              className="conn-toggle"
-              title={oauth || service?.panelLabel ? "Cada 30 min, sin duplicar y sin gastar uso de Claude" : "Cada 10 min, sin gastar uso de Claude"}
-            >
-              <input type="checkbox" checked={conn.config.panel !== false} onChange={(e) => patch({ config: { panel: e.target.checked } })} /> Al día
-            </label>
-            <span className="muted small">
-              Última: {lastSync}
-              {conn.lastError && <span className="bad-text"> · {conn.lastError}</span>}
-            </span>
-          </span>
-        </div>
-      )}
-      {!hasPanel && conn.lastError && <p className="bad-text small">{conn.lastError}</p>}
+      {conn.lastError && <p className="bad-text small">{conn.lastError}</p>}
     </div>
   );
 }
