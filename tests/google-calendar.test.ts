@@ -8,7 +8,7 @@ import { buildTools, type ToolDef } from "@/lib/agents/tools";
 import { buildSystemPrompt } from "@/lib/agents/prompt";
 import { redact } from "@/lib/secrets";
 import { getConnection, listConnections, setGrant, updateConnection } from "@/lib/repo/connections";
-import { addConnection, connectionView, syncDueConnections } from "@/lib/connections";
+import { addConnection, connectionView } from "@/lib/connections";
 import { getService, serviceInfo } from "@/lib/connections/registry";
 import { setTransportForTests } from "@/lib/connections/github/api";
 import { GOOGLE_CALENDAR } from "@/lib/connections/google";
@@ -27,11 +27,9 @@ import {
   startAuth,
   type GoogleRequest,
 } from "@/lib/connections/google/api";
-import { mergeGoogleEvents, plainText, syncGoogleCalendar, toPanelEvent } from "@/lib/connections/google/sync";
+import { plainText } from "@/lib/connections/google/sync";
 import { addDays, dateToLocal, localToDate } from "@/lib/connections/google/time";
 import { listActivity } from "@/lib/repo/system";
-import { archivePanel, createPanel, getPanel, type Panel } from "@/lib/repo/panels";
-import type { CalendarData } from "@/lib/panels/types";
 import "@/lib/agents/modules";
 import type { Agent } from "@/lib/types";
 
@@ -79,7 +77,7 @@ function fakeGoogle() {
   });
 }
 
-let marta: Agent, ana: Agent, sara: Agent, calendarPanel: Panel;
+let marta: Agent, ana: Agent, sara: Agent;
 
 beforeEach(() => {
   setDbForTests(openDb(":memory:"));
@@ -87,7 +85,6 @@ beforeEach(() => {
   marta = hireAgent({ name: "Marta", specialty: "Coordinadora de proyectos" });
   ana = hireAgent({ name: "Ana", specialty: "Finanzas personales" });
   sara = hireAgent({ name: "Sara", specialty: "Marketing" });
-  calendarPanel = createPanel({ type: "calendario", title: "Calendario", actor: { by: "user" } });
   setTransportForTests(async () => {
     throw new Error("Sin GitHub en este test");
   });
@@ -96,10 +93,9 @@ beforeEach(() => {
 
 const google = () => listConnections("google_calendar")[0];
 
-/** Conexión de Google Calendar volcando al panel «Calendario»: lectura para Zen, Marta y Ana. */
+/** Conexión de Google Calendar: lectura para Zen, Marta y Ana. */
 function connectGoogle() {
   const c = addConnection(GOOGLE_CALENDAR, { calendars: ["primary"] });
-  updateConnection(c.id, { statusPanelId: calendarPanel.id });
   for (const a of [getChief()!, marta, ana]) setGrant(c.id, a.id, "lectura");
   return getConnection(c.id)!;
 }
@@ -126,7 +122,6 @@ async function call(agent: Agent, name: string, args: Record<string, unknown>) {
   if (!t) throw new Error(`${agent.name} no tiene ${name}`);
   return (await t.handler(args, {})) as { content: { text: string }[]; isError?: boolean };
 }
-const panelEvents = () => (getPanel(calendarPanel.id)!.data as CalendarData).events;
 
 describe("zona horaria", () => {
   it("hora local ↔ instante, con cambio de hora", () => {
@@ -139,59 +134,30 @@ describe("zona horaria", () => {
   });
 });
 
-describe("conversión y mezcla de eventos", () => {
-  it("evento con hora y de varios días (fin inclusivo)", () => {
-    expect(toPanelEvent({ id: "a", summary: "Cita", start: { dateTime: "2026-10-05T08:00:00Z" }, end: { dateTime: "2026-10-05T09:30:00Z" } }, TZ)).toEqual({
-      id: "gcal_a",
-      title: "Cita",
-      start: "2026-10-05T10:00",
-      end: "2026-10-05T11:30",
-      allDay: false,
-    });
-    expect(toPanelEvent({ id: "b", start: { date: "2026-10-10" }, end: { date: "2026-10-13" } }, TZ)).toMatchObject({ start: "2026-10-10", end: "2026-10-12", allDay: true, title: "(sin título)" });
-    expect(toPanelEvent({ id: "c", start: { date: "2026-10-10" }, end: { date: "2026-10-11" } }, TZ)!.end).toBeUndefined();
+describe("texto de los eventos", () => {
+  it("descripción HTML → texto plano", () => {
     expect(plainText("<p>Hola<br/>Ana &amp; Leo</p>")).toBe("Hola\nAna & Leo");
-  });
-
-  it("no duplica, actualiza, quita lo borrado en la ventana y respeta lo manual", () => {
-    const data: CalendarData = {
-      view: "semana",
-      events: [
-        { id: "manual1", title: "Gimnasio", start: "2026-10-05T19:00" },
-        { id: "gcal_a", title: "Viejo", start: "2026-10-05T10:00", color: "#f00" },
-        { id: "gcal_borrado", title: "Ya no existe", start: "2026-10-06" },
-        { id: "gcal_fuera", title: "Fuera de ventana", start: "2026-12-01" },
-      ],
-    };
-    const incoming = [
-      { id: "gcal_a", title: "Nuevo", start: "2026-10-05T10:00", allDay: false },
-      { id: "gcal_b", title: "Otro", start: "2026-10-07", allDay: true },
-    ];
-    const r = mergeGoogleEvents(data, incoming, "2026-10-01", "2026-11-01");
-    expect([r.added, r.updated, r.removed]).toEqual([1, 1, 1]);
-    expect(r.data.events.map((e) => e.id)).toEqual(["manual1", "gcal_a", "gcal_fuera", "gcal_b"]);
-    expect(r.data.events[1]).toMatchObject({ title: "Nuevo", color: "#f00" });
-    const again = mergeGoogleEvents(r.data, incoming, "2026-10-01", "2026-11-01");
-    expect([again.added, again.updated, again.removed]).toEqual([0, 0, 0]);
+    expect(plainText("   ")).toBeUndefined();
   });
 });
 
 describe("conexión y permisos", () => {
-  it("no hay conexión de serie; al crearla queda en solo lectura con su panel", () => {
+  it("no hay conexión de serie; al crearla queda en solo lectura y sin panel", () => {
     expect(listConnections("google_calendar")).toHaveLength(0);
     connectGoogle();
     const all = listConnections("google_calendar");
     expect(all).toHaveLength(1);
     const c = all[0];
     expect(c.grants).toEqual({ [getChief()!.id]: "lectura", [marta.id]: "lectura", [ana.id]: "lectura" });
-    expect(c.statusPanelId).toBe(calendarPanel.id);
-    expect(c.config).toEqual({ calendars: ["primary"], panel: true });
+    expect(c.statusPanelId).toBeNull();
+    expect(c.config).toEqual({ calendars: ["primary"] });
     expect(serviceInfo(getService("google_calendar"))).toMatchObject({ readOnly: true, authKind: "oauth", supportsSecret: false });
+    expect("sync" in getService("google_calendar")).toBe(false);
   });
 
   it("herramientas solo para quien tiene permiso (y nunca de escritura)", () => {
     connectGoogle();
-    const names = ["google_calendario_calendarios", "google_calendario_eventos", "google_calendario_volcar"];
+    const names = ["google_calendario_calendarios", "google_calendario_eventos"];
     expect(googleNames(getChief()!)).toEqual(names);
     expect(googleNames(marta)).toEqual(names);
     expect(googleNames(ana)).toEqual(names);
@@ -261,7 +227,7 @@ describe("OAuth", () => {
   });
 });
 
-describe("herramientas y volcado", () => {
+describe("herramientas", () => {
   beforeEach(() => connectGoogle());
 
   it("sin autorizar, la herramienta lo explica", async () => {
@@ -289,34 +255,15 @@ describe("herramientas y volcado", () => {
     expect((await call(ana, "google_calendario_eventos", { desde: "2026-01-01", hasta: "2026-12-31" })).content[0].text).toMatch(/demasiado largo/);
   });
 
-  it("volcar al panel por id de Google: sin duplicados y sin versiones vacías", async () => {
+  it("no hay volcado a paneles: el prompt manda consultar la agenda cuando haga falta", async () => {
     await authorize();
-    const r = await call(getChief()!, "google_calendario_volcar", { desde: "2026-10-01", hasta: "2026-10-31" });
-    expect(r.content[0].text).toContain("2 nuevo(s)");
-    expect(panelEvents().map((e) => e.id).sort()).toEqual(["gcal_ev1", "gcal_ev2"]);
-    const v = getPanel(calendarPanel.id)!.version;
-
-    await call(getChief()!, "google_calendario_volcar", { desde: "2026-10-01", hasta: "2026-10-31" });
-    expect(panelEvents()).toHaveLength(2);
-    expect(getPanel(calendarPanel.id)!.version).toBe(v);
-
-    events.primary = [events.primary[0]]; // «Vacaciones» borrado en Google
-    const r3 = await call(getChief()!, "google_calendario_volcar", { desde: "2026-10-01", hasta: "2026-10-31" });
-    expect(r3.content[0].text).toContain("1 quitado(s)");
-    expect(panelEvents().map((e) => e.id)).toEqual(["gcal_ev1"]);
-    expect(calls.every((x) => x.method === "GET" || x.url.startsWith("https://oauth2."))).toBe(true);
-  });
-
-  it("el worker vuelca solo si está autorizado y respeta la papelera", async () => {
-    const at = new Date("2026-10-04T10:00:00Z");
-    expect(await syncDueConnections(at)).not.toContain("Google Calendar"); // sin autorizar: no cuenta
-    await authorize();
-    expect(await syncDueConnections(at)).toContain("Google Calendar");
-    expect(panelEvents()).toHaveLength(2);
-    expect(await syncDueConnections(new Date(at.getTime() + 10 * 60_000))).not.toContain("Google Calendar"); // cada 30 min
-
-    archivePanel(calendarPanel.id, { by: "user" });
-    expect(await syncGoogleCalendar(getConnection(google().id)!, at)).toBe(false);
-    expect(getConnection(google().id)!.config.panel).toBe(false);
+    const task = createTask({ agentId: marta.id, kind: "chat", prompt: "x" });
+    const prompt = buildSystemPrompt(marta, task);
+    expect(prompt).not.toContain("google_calendario_volcar");
+    expect(prompt).not.toContain("panel de calendario");
+    expect(prompt).toContain("google_calendario_eventos(desde, hasta) para consultar la agenda");
+    await expect(call(getChief()!, "google_calendario_volcar", {})).rejects.toThrow(/no tiene/);
+    // La configuración antigua (con «panel») se limpia al guardarla de nuevo.
+    expect(getService(GOOGLE_CALENDAR).normalizeConfig({ calendars: "primary", panel: true })).toEqual({ calendars: ["primary"] });
   });
 });
