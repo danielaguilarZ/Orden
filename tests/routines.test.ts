@@ -5,8 +5,18 @@ import { getChief, updateAgent } from "@/lib/repo/agents";
 import { createRoutine, getRoutine, listRoutines } from "@/lib/repo/routines";
 import { finishTask, listTasks } from "@/lib/repo/tasks";
 import { listActivity } from "@/lib/repo/system";
-import { describeSchedule, nextRun, scheduleSchema } from "@/lib/routines/schedule";
-import { fireRoutine, tickRoutines } from "@/lib/routines/runner";
+import { describeSchedule, nextRun, ROUTINE_TEMPLATES, scheduleSchema } from "@/lib/routines/schedule";
+import { fireRoutine, routinePrompt, tickRoutines } from "@/lib/routines/runner";
+
+describe("rutinas sin paneles", () => {
+  it("el resultado se guarda en Archivos/Daily y las plantillas no hablan de paneles", () => {
+    const p = routinePrompt({ name: "Informe", prompt: "Haz el informe", schedule: { tipo: "diaria", hora: "09:00" } } as Parameters<typeof routinePrompt>[0]);
+    expect(p).toContain("Archivos/Daily");
+    expect(p).toContain("archivo_escribir");
+    expect(p).not.toMatch(/panel/i);
+    for (const t of ROUTINE_TEMPLATES) expect(t.prompt, t.name).not.toMatch(/panel/i);
+  });
+});
 
 // Fechas locales para no depender de la zona horaria de quien ejecute los tests.
 const d = (y: number, m: number, day: number, h = 0, min = 0) => new Date(y, m - 1, day, h, min);
