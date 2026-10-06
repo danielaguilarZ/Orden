@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { openDb, setDbForTests } from "@/lib/db";
 import { ensureSeed } from "@/lib/seed";
 import { decorate, removeKinds } from "@/living/decorator";
-import { autoArrange, checkItem, dropTarget, layoutWarnings, moveItem, placeNew, removeItem, rotateItem } from "@/living/roomEditor";
+import { autoArrange, checkItem, duplicateItem, layoutWarnings, moveItem, placeNear, placeNew, removeItem, rotateItem } from "@/living/roomEditor";
 import { getRoom, listRooms } from "@/lib/repo/rooms";
 import { buildRoom, redecorateRoom, setRoomLayout } from "@/lib/rooms";
 import type { FurnitureItem } from "@/lib/types";
@@ -51,12 +51,36 @@ describe("editor de sala: colocar", () => {
     expect(at(rot.furniture, r.id!)).toMatchObject({ x: 0, y: 3, flip: true });
   });
 
-  it("dropTarget traduce las franjas de muro", () => {
-    expect(dropTarget("cuadro", 4, -1)).toEqual({ x: 4, y: 0, flip: false });
-    expect(dropTarget("cuadro", -1, 6)).toEqual({ x: 0, y: 6, flip: true });
-    expect(dropTarget("cuadro", 5, 5)).toBeNull();
-    expect(dropTarget("planta", -1, 3)).toBeNull();
-    expect(dropTarget("planta", 2, 3, true)).toEqual({ x: 2, y: 3, flip: true });
+  it("duplicar pone uno igual (tipo, giro y colores) en el hueco libre más cercano", () => {
+    let items = placeNew([], "sofa", 2, 2, true, ctx, { $tela: "#123456" }).furniture;
+    const id = items[0].id;
+    const r = duplicateItem(items, id, ctx);
+    expect(r.error).toBeUndefined();
+    const copy = at(r.furniture, r.id!);
+    expect(copy).toMatchObject({ kind: "sofa", flip: true, tint: { $tela: "#123456" }, manual: true });
+    expect(copy.id).not.toBe(id);
+    // Pegado al original: a una baldosa de distancia.
+    expect(Math.abs(copy.x - 2) + Math.abs(copy.y - 2)).toBe(1);
+    items = r.furniture;
+    // Un adorno de pared se duplica en la pared, sin solaparse.
+    const pic = placeNew(items, "cuadro", 3, 0, false, ctx);
+    const dup = duplicateItem(pic.furniture, pic.id!, ctx);
+    expect(dup.error).toBeUndefined();
+    const copyPic = at(dup.furniture, dup.id!);
+    expect(copyPic).toMatchObject({ kind: "cuadro", y: 0 });
+    expect(copyPic.flip).toBeFalsy();
+    expect(Math.abs(copyPic.x - 3)).toBe(1);
+  });
+
+  it("duplicar avisa si ya no cabe y placeNear busca el hueco más cercano", () => {
+    // Un solo tramo de muro alto: el segundo cuadro no tiene dónde ir.
+    const oneWall = { ...ctx, northWall: [true, ...new Array(9).fill(false)], westWall: new Array(10).fill(false) };
+    const items = placeNew([], "cuadro", 0, 0, false, oneWall).furniture;
+    expect(items).toHaveLength(1);
+    expect(duplicateItem(items, items[0].id, oneWall).error).toMatch(/No queda sitio/);
+    expect(duplicateItem(items, "nada", oneWall).error).toMatch(/ya no está/);
+    const near = placeNear([], "planta", { x: 5, y: 5 }, false, ctx);
+    expect(at(near.furniture, near.id!)).toMatchObject({ x: 5, y: 5 });
   });
 });
 
