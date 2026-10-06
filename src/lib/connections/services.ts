@@ -22,3 +22,4 @@ import "./stocks";
 import "./fx";
 import "./readwise";
 import "./raindrop";
+import "./obsidian";
