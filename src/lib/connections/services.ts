@@ -10,3 +10,4 @@ import "./telegram";
 import "./notion";
 import "./todoist";
 import "./trello";
+import "./linear";
