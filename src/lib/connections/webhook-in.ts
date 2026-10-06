@@ -179,7 +179,6 @@ registerService({
   label: "Webhook entrante",
   description: "Tus scripts y automatizaciones del PC avisan a Orden con un POST: se apunta en Actividad y, si quieres, se lo encarga a un agente.",
   category: "auto",
-  icon: "📥",
   readOnly: true,
   levels: { lectura: "Lectura: ver lo que ha llegado", completo: "Completo: igual que lectura" },
   fields: [

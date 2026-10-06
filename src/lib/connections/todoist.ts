@@ -172,7 +172,6 @@ registerService({
   label: "Todoist",
   description: "Tus tareas de Todoist: ver las de hoy, las vencidas o cualquier filtro; con permiso completo, crear y completar tareas.",
   category: "tareas",
-  icon: "✅",
   levels: {
     lectura: "Lectura: ver tareas (con filtros) y proyectos",
     completo: `Completo: además crear y completar tareas (máx. ${todoistLimit.max} cambios al día; nunca borra)`,
