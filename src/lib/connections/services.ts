@@ -13,3 +13,4 @@ import "./trello";
 import "./linear";
 import "./discord";
 import "./slack";
+import "./ntfy";
