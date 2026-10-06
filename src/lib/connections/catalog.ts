@@ -7,22 +7,21 @@
 export interface ServiceCategory {
   key: string;
   label: string;
-  icon: string;
 }
 
 /** Orden en que se muestran en el catálogo. */
 export const CATEGORIES: ServiceCategory[] = [
-  { key: "tareas", label: "Tareas y proyectos", icon: "✅" },
-  { key: "notas", label: "Notas y lectura", icon: "📚" },
-  { key: "agenda", label: "Agenda", icon: "📅" },
-  { key: "avisos", label: "Avisos y mensajes", icon: "🔔" },
-  { key: "info", label: "Información", icon: "🌍" },
-  { key: "finanzas", label: "Finanzas", icon: "💶" },
-  { key: "hogar", label: "Hogar, salud y ocio", icon: "🏠" },
-  { key: "dev", label: "Desarrollo y webs", icon: "💻" },
-  { key: "auto", label: "Automatización", icon: "⚙️" },
-  { key: "correo", label: "Correo y archivos", icon: "✉️" },
-  { key: "otros", label: "Otros", icon: "🧩" },
+  { key: "tareas", label: "Tareas y proyectos" },
+  { key: "notas", label: "Notas y lectura" },
+  { key: "agenda", label: "Agenda" },
+  { key: "avisos", label: "Avisos y mensajes" },
+  { key: "info", label: "Información" },
+  { key: "finanzas", label: "Finanzas" },
+  { key: "hogar", label: "Hogar, salud y ocio" },
+  { key: "dev", label: "Desarrollo y webs" },
+  { key: "auto", label: "Automatización" },
+  { key: "correo", label: "Correo y archivos" },
+  { key: "otros", label: "Otros" },
 ];
 
 export interface UpcomingService {

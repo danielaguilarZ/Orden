@@ -82,7 +82,6 @@ registerService({
   label: "Slack (webhook)",
   description: "Mensajes a un canal de Slack con un Incoming Webhook. Solo texto, sin menciones masivas y con un máximo diario.",
   category: "avisos",
-  icon: "💼",
   levels: {
     lectura: "Lectura: saber que existe el canal (no envía nada)",
     completo: `Completo: enviar mensajes al canal (máx. ${slackLimit.max} al día)`,

@@ -197,7 +197,6 @@ registerService({
   label: "Trello",
   description: "Tus tableros de Trello: ver listas y tarjetas y buscar; con permiso completo, crear tarjetas y comentar.",
   category: "tareas",
-  icon: "📋",
   levels: {
     lectura: "Lectura: ver tableros, listas y tarjetas y buscar",
     completo: `Completo: además crear tarjetas y comentar (máx. ${trelloLimit.max} al día; nunca mueve, archiva ni borra)`,

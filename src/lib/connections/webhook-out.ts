@@ -85,7 +85,6 @@ registerService({
   label: "Webhook saliente",
   description: "Envía datos a Zapier, Make, n8n, IFTTT o tus scripts: conecta Orden con casi cualquier servicio. Solo con permiso completo.",
   category: "auto",
-  icon: "📤",
   levels: {
     lectura: "Lectura: saber que existe (no envía nada)",
     completo: `Completo: enviar datos al webhook (máx. ${webhookOutLimit.max} al día)`,

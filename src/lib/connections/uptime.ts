@@ -67,7 +67,6 @@ registerService({
   label: "Monitor de webs",
   description: "Comprueba si tus webs (o las de tus clientes) están en línea, con su código y tiempo de respuesta. Sin claves.",
   category: "dev",
-  icon: "📡",
   readOnly: true,
   levels: { lectura: "Lectura: comprobar el estado de las webs", completo: "Completo: igual que lectura" },
   fields: [{ key: "webs", label: "Direcciones (separadas por comas)", placeholder: "https://miweb.es, https://cliente.com" }],

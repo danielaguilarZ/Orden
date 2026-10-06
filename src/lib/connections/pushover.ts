@@ -75,7 +75,6 @@ registerService({
   label: "Pushover (push al móvil)",
   description: "Notificaciones push a tus dispositivos con Pushover. Solo envío, con un máximo diario.",
   category: "avisos",
-  icon: "🔔",
   levels: {
     lectura: "Lectura: saber que existe el canal (no envía nada)",
     completo: `Completo: enviarte notificaciones (máx. ${pushoverLimit.max} al día)`,

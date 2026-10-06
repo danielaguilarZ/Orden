@@ -69,7 +69,6 @@ registerService({
   label: "Discord (webhook)",
   description: "Mensajes a un canal de Discord tuyo con un webhook. Solo texto, sin menciones y con un máximo diario.",
   category: "avisos",
-  icon: "🎮",
   levels: {
     lectura: "Lectura: saber que existe el canal (no envía nada)",
     completo: `Completo: enviar mensajes de texto al canal (máx. ${discordLimit.max} al día)`,

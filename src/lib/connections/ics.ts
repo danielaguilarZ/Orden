@@ -335,7 +335,6 @@ registerService({
   label: "Calendario iCal (URL)",
   description: "Cualquier calendario por su dirección .ics (Outlook, iCloud, Google, festivos, reservas…). Solo lectura: los agentes consultan sus eventos.",
   category: "agenda",
-  icon: "🗓️",
   readOnly: true,
   levels: { lectura: "Lectura: ver los eventos del calendario", completo: "Completo: igual que lectura (no se escribe nada)" },
   fields: [{ key: "nombre", label: "Nombre", placeholder: "Trabajo (Outlook)" }],

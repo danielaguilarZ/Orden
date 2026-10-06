@@ -93,7 +93,6 @@ registerService({
   label: "Bolsa (Yahoo Finance)",
   description: "Cotizaciones de acciones, índices y ETF (IBEX, S&P 500, tus fondos…). Gratis y sin cuenta; datos con posible retraso.",
   category: "finanzas",
-  icon: "📈",
   readOnly: true,
   levels: { lectura: "Lectura: consultar cotizaciones y buscar símbolos", completo: "Completo: igual que lectura" },
   fields: [{ key: "simbolos", label: "Símbolos por defecto", placeholder: "^IBEX, SAN.MC, VWCE.DE" }],

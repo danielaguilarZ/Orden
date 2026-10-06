@@ -138,7 +138,6 @@ registerService({
   label: "Readwise / Reader",
   description: "Tus subrayados de libros y artículos y tu lista de lectura de Reader; con permiso completo, guardar enlaces para leer después.",
   category: "notas",
-  icon: "🔖",
   levels: {
     lectura: "Lectura: subrayados, notas y lista de Reader",
     completo: `Completo: además guardar enlaces en Reader (máx. ${readwiseLimit.max} al día)`,
