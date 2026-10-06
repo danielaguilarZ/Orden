@@ -16,3 +16,4 @@ import "./slack";
 import "./ntfy";
 import "./pushover";
 import "./homeassistant";
+import "./ics";
