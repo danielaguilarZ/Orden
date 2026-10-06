@@ -210,7 +210,6 @@ registerService({
   label: "Notas locales (Obsidian)",
   description: "Una carpeta de notas de tu PC (bóveda de Obsidian o .md/.txt): buscar y leer; con permiso completo, crear notas o añadir al final.",
   category: "notas",
-  icon: "🗂️",
   levels: {
     lectura: "Lectura: listar, buscar y leer notas .md/.txt",
     completo: `Completo: además crear notas o añadir texto al final (nunca borra ni sobrescribe; máx. ${notesLimit.max} al día)`,

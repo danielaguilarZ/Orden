@@ -127,7 +127,6 @@ registerService({
   label: "ntfy (push al móvil)",
   description: "Notificaciones push a tu móvil con ntfy, gratis y sin cuenta. También permite leer lo que te mandas al tema.",
   category: "avisos",
-  icon: "📲",
   levels: {
     lectura: "Lectura: leer los mensajes del tema",
     completo: `Completo: además enviarte notificaciones (máx. ${ntfyLimit.max} al día)`,

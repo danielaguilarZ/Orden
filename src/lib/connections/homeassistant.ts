@@ -146,7 +146,6 @@ registerService({
   label: "Home Assistant",
   description: "Tu casa domótica: estados de luces, sensores y enchufes; con permiso completo, solo las acciones que tú permitas.",
   category: "hogar",
-  icon: "🏠",
   levels: {
     lectura: "Lectura: ver estados y atributos de las entidades",
     completo: `Completo: además ejecutar las acciones de la lista blanca (máx. ${haLimit.max} al día)`,
