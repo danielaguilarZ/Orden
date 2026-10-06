@@ -2,12 +2,10 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { defineTool, type ToolContext, type ToolDef } from "../agents/tools";
 import { TIMEZONE } from "../agents/prompt";
-import type { ListData, ListItem } from "../panels/types";
 import { getAgent, listAgents } from "../repo/agents";
 import { activeConversation, addMessage } from "../repo/chat";
-import { getConnection, getConnectionSecret, markSync, updateConnection, type Connection } from "../repo/connections";
-import { createPanel, getPanel, replacePanelData, type Actor } from "../repo/panels";
-import { logActivity } from "../repo/system";
+import { getConnection, getConnectionSecret, markSync, type Connection } from "../repo/connections";
+import { getSetting, logActivity, setSetting } from "../repo/system";
 import { createTask } from "../repo/tasks";
 import { auditor, clip, DailyLimit, guard } from "./kit";
 import { dateToLocal } from "./google/time";
@@ -16,8 +14,9 @@ import { registerService, type AgentGrant } from "./registry";
 /**
  * Webhook entrante: tus scripts o automatizaciones del PC (n8n, Home
  * Assistant, Tasker por ADB, un .bat…) avisan a Orden con un POST a
- * `/api/webhooks/<id>` y la clave secreta. Lo recibido se apunta en un panel
- * lista y, si se configura, se encarga a un agente (máx. 20 encargos al día).
+ * `/api/webhooks/<id>` y la clave secreta. Lo recibido se apunta en la
+ * bandeja de la conexión (los últimos 200, en ajustes) y en Actividad y, si se
+ * configura, se encarga a un agente (máx. 20 encargos al día).
  * Solo desde este PC (como toda la API de Orden).
  */
 
@@ -25,7 +24,13 @@ export const MAX_BODY = 16_000;
 export const MAX_ITEMS = 200;
 export const receiveLimit = new DailyLimit(200, "webhooks recibidos");
 export const taskLimit = new DailyLimit(20, "encargos por webhook");
-const ACTOR: Actor = { by: "sistema" };
+
+/** Un aviso recibido: «AAAA-MM-DD HH:MM · resumen» y el cuerpo (recortado). */
+export interface ReceivedItem {
+  id: string;
+  text: string;
+  notes: string;
+}
 
 export class WebhookError extends Error {
   constructor(
@@ -65,13 +70,12 @@ export function summarize(body: string): { title: string; json: unknown } {
   return { title: clip(body.trim().replace(/\s+/g, " ") || "(vacío)", 120), json };
 }
 
-/** Panel lista de lo recibido (lo crea si falta o está en la papelera). */
-function inbox(c: Connection) {
-  const saved = c.statusPanelId ? getPanel(c.statusPanelId) : null;
-  if (saved && !saved.archived && saved.type === "lista") return saved;
-  const panel = createPanel({ type: "lista", title: `Webhook · ${String(c.config.nombre)}`, data: { items: [], checkable: true }, actor: ACTOR });
-  updateConnection(c.id, { statusPanelId: panel.id });
-  return panel;
+const inboxKey = (connectionId: string) => `webhook.recibidos.${connectionId}`;
+
+/** Bandeja de lo recibido por un webhook, lo más nuevo primero. */
+export function receivedItems(connectionId: string): ReceivedItem[] {
+  const list = getSetting<ReceivedItem[]>(inboxKey(connectionId), []);
+  return Array.isArray(list) ? list : [];
 }
 
 export interface Received {
@@ -80,7 +84,7 @@ export interface Received {
   taskId?: string;
 }
 
-/** Recibe una llamada: valida, apunta en el panel y, si toca, crea el encargo. */
+/** Recibe una llamada: valida, apunta en la bandeja y, si toca, crea el encargo. */
 export function receiveWebhook(id: string, token: string, body: string, at = new Date()): Received {
   const c = getConnection(id);
   if (!c || c.service !== "webhook_entrada") throw new WebhookError("No existe ese webhook.", 404);
@@ -98,11 +102,9 @@ export function receiveWebhook(id: string, token: string, body: string, at = new
 
   const { title, json } = summarize(body);
   const when = dateToLocal(at, TIMEZONE).replace("T", " ");
-  const panel = inbox(c);
-  const data = getPanel(panel.id)!.data as ListData;
-  const item: ListItem = { id: `wh_${at.getTime().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, text: `${when} · ${title}`, done: false, notes: clip(json ? JSON.stringify(json, null, 2) : body, 4000) } as ListItem;
-  replacePanelData(panel.id, { ...data, items: [item, ...data.items].slice(0, MAX_ITEMS) }, ACTOR);
-  logActivity("conexion", `Webhook «${c.name}» recibido: ${title}`, null, { connectionId: c.id, panelId: panel.id });
+  const item: ReceivedItem = { id: `wh_${at.getTime().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, text: `${when} · ${title}`, notes: clip(json ? JSON.stringify(json, null, 2) : body, 4000) };
+  setSetting(inboxKey(c.id), [item, ...receivedItems(c.id)].slice(0, MAX_ITEMS));
+  logActivity("conexion", `Webhook «${c.name}» recibido: ${title}`, null, { connectionId: c.id });
   markSync(c.id, null, at);
 
   const out: Received = { ok: true, item: item.id };
@@ -145,8 +147,7 @@ Es una ejecución automática: el usuario no está esperando en el chat. Respond
 
 /** Lo último recibido (para los agentes). */
 export function recentText(c: Connection, max = 20): string {
-  const panel = c.statusPanelId ? getPanel(c.statusPanelId) : null;
-  const items = panel && !panel.archived ? (panel.data as ListData).items.slice(0, max) : [];
+  const items = receivedItems(c.id).slice(0, max);
   if (!items.length) return `Todavía no ha llegado nada a «${c.name}».`;
   return items.map((i) => `- ${i.text}${i.notes ? `\n  ${clip(i.notes.replace(/\s+/g, " "), 300)}` : ""}`).join("\n");
 }
@@ -176,7 +177,7 @@ function webhookInTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
 registerService({
   key: "webhook_entrada",
   label: "Webhook entrante",
-  description: "Tus scripts y automatizaciones del PC avisan a Orden con un POST: se apunta en un panel y, si quieres, se lo encarga a un agente.",
+  description: "Tus scripts y automatizaciones del PC avisan a Orden con un POST: se apunta en Actividad y, si quieres, se lo encarga a un agente.",
   category: "auto",
   icon: "📥",
   readOnly: true,
@@ -184,7 +185,7 @@ registerService({
   fields: [
     { key: "nombre", label: "Nombre", placeholder: "Alertas de n8n" },
     { key: "agente", label: "Encargar a (opcional)", placeholder: "Zen" },
-    { key: "instrucciones", label: "Qué debe hacer el agente (opcional)", placeholder: "Si es un pago, apúntalo en el panel de gastos" },
+    { key: "instrucciones", label: "Qué debe hacer el agente (opcional)", placeholder: "Si es un pago, avísame con el importe" },
   ],
   supportsSecret: true,
   secretLabel: "Clave secreta",
@@ -193,7 +194,7 @@ registerService({
     "Ponle nombre y, si quieres que alguien actúe al recibirlo, el agente y qué debe hacer. Pulsa «Añadir».",
     "En la ficha, inventa una clave secreta larga (24+ caracteres) y guárdala (cifrada).",
     "Pulsa «Probar conexión»: te da la dirección y un ejemplo con curl. Solo funciona desde este PC (Orden no se abre a internet).",
-    "Envía un POST con «Authorization: Bearer <tu clave>» y un JSON o texto (máx. 16 KB). Llega al panel «Webhook · <nombre>».",
+    "Envía un POST con «Authorization: Bearer <tu clave>» y un JSON o texto (máx. 16 KB). Queda en Actividad y los agentes con permiso lo leen con webhook_recibidos.",
   ],
   normalizeConfig(input) {
     const nombre = String(input.nombre ?? "").trim().slice(0, 60);

@@ -1,19 +1,12 @@
 import { TIMEZONE } from "../../agents/prompt";
-import { createPanel, getPanel, replacePanelData, type Actor } from "../../repo/panels";
-import { listConnections, markSync, updateConnection, type Connection } from "../../repo/connections";
-import { logActivity } from "../../repo/system";
-import { redact } from "../../secrets";
-import { RepoApi, resolveTransport, type CommitItem, type IssueItem, type PullItem } from "./api";
+import { RepoApi, type CommitItem, type IssueItem, type PullItem } from "./api";
 
 /**
- * Panel vivo «Estado del repo»: PRs e issues abiertos y últimos commits.
- * Lo actualiza el worker cada 10 minutos sin llamar al modelo (no gasta uso)
- * y solo guarda una versión nueva si algo ha cambiado.
+ * Resumen del repo (herramienta github_resumen): PRs e issues abiertos y
+ * últimos commits, consultado en el momento.
  */
 
-export const SYNC_EVERY_MS = 10 * 60_000;
-export const SYSTEM_ACTOR: Actor = { by: "sistema" };
-const STAMP_PREFIX = "_Actualizado:";
+const STAMP_PREFIX = "_Consultado:";
 
 export interface RepoSnapshot {
   repo: string;
@@ -29,10 +22,10 @@ const linkText = (s: string) => s.replace(/[[\]\n\r|]/g, " ").replace(/\s+/g, " 
 const day = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { timeZone: TIMEZONE, day: "numeric", month: "short" });
 const labelsOf = (i: IssueItem) => i.labels.map((l) => (typeof l === "string" ? l : l.name)).filter(Boolean);
 
-/** Markdown del panel (función pura; la marca de hora va en la línea 2). */
+/** Markdown del resumen (función pura; la marca de hora va en la línea 2). */
 export function statusMarkdown(s: RepoSnapshot, at: Date): string {
   const stamp = at.toLocaleString("es-ES", { timeZone: TIMEZONE, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-  const lines = [`**[${s.repo}](${s.url})** · rama principal \`${s.defaultBranch}\``, `${STAMP_PREFIX} ${stamp} · se comprueba cada ${SYNC_EVERY_MS / 60_000} min_`, ""];
+  const lines = [`**[${s.repo}](${s.url})** · rama principal \`${s.defaultBranch}\``, `${STAMP_PREFIX} ${stamp}_`, ""];
 
   lines.push(`### Pull requests abiertos (${s.pulls.length})`);
   if (!s.pulls.length) lines.push("Ninguno.");
@@ -59,14 +52,6 @@ export function statusMarkdown(s: RepoSnapshot, at: Date): string {
   return lines.join("\n");
 }
 
-/** Contenido sin la marca de hora, para saber si algo ha cambiado de verdad. */
-export function withoutStamp(md: string): string {
-  return md
-    .split("\n")
-    .filter((l) => !l.startsWith(STAMP_PREFIX))
-    .join("\n");
-}
-
 export async function fetchSnapshot(api: RepoApi): Promise<RepoSnapshot> {
   const info = await api.info();
   const [pulls, issues, commits] = await Promise.all([
@@ -75,39 +60,4 @@ export async function fetchSnapshot(api: RepoApi): Promise<RepoSnapshot> {
     api.commits({ branch: info.default_branch, limit: 8 }),
   ]);
   return { repo: info.full_name, url: info.html_url, defaultBranch: info.default_branch, pulls, issues: issues.filter((i) => !i.pull_request).slice(0, 15), commits };
-}
-
-function panelTitle(c: Connection) {
-  const others = listConnections("github").filter((x) => x.id !== c.id && x.enabled);
-  return others.length ? `Estado del repo · ${String(c.config.repo)}` : "Estado del repo";
-}
-
-/**
- * Actualiza (o crea) el panel de una conexión de GitHub.
- * Si el usuario lo mandó a la papelera, se respeta: se desactiva el panel.
- */
-export async function syncGithubStatus(c: Connection, at = new Date()): Promise<void> {
-  if (c.config.panel === false) return;
-  try {
-    const { transport } = await resolveTransport(c);
-    const api = new RepoApi(String(c.config.repo), transport);
-    const md = statusMarkdown(await fetchSnapshot(api), at);
-    const panel = c.statusPanelId ? getPanel(c.statusPanelId) : null;
-    if (panel?.archived) {
-      updateConnection(c.id, { config: { ...c.config, panel: false } });
-      logActivity("sistema", `El panel «${panel.title}» está en la papelera: deja de actualizarse (actívalo de nuevo en Conexiones).`);
-    } else if (!panel) {
-      const created = createPanel({ type: "notas", title: panelTitle(c), data: { markdown: md }, actor: SYSTEM_ACTOR, layout: { size: "ancho" } });
-      updateConnection(c.id, { statusPanelId: created.id });
-    } else {
-      const prev = String((panel.data as { markdown?: string }).markdown ?? "");
-      if (withoutStamp(prev) !== withoutStamp(md)) replacePanelData(panel.id, { markdown: md }, SYSTEM_ACTOR);
-    }
-    markSync(c.id, null, at);
-  } catch (err) {
-    const msg = redact((err as Error).message);
-    if (msg !== c.lastError) logActivity("error", `Conexión «${c.name}»: ${msg}`);
-    markSync(c.id, msg, at);
-    throw new Error(msg);
-  }
 }
