@@ -101,7 +101,6 @@ registerService({
   label: "Criptomonedas (CoinGecko)",
   description: "Precios y variación en 24 h de Bitcoin, Ethereum y miles más. Gratis, sin cuenta (clave opcional).",
   category: "finanzas",
-  icon: "🪙",
   readOnly: true,
   levels: { lectura: "Lectura: consultar precios y buscar monedas", completo: "Completo: igual que lectura" },
   fields: [

@@ -65,7 +65,6 @@ registerService({
   label: "Divisas (BCE)",
   description: "Tipos de cambio oficiales del Banco Central Europeo y conversión de importes, también de fechas pasadas. Gratis y sin claves.",
   category: "finanzas",
-  icon: "💱",
   readOnly: true,
   levels: { lectura: "Lectura: consultar tipos de cambio y convertir", completo: "Completo: igual que lectura" },
   fields: [

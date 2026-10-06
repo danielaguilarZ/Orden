@@ -169,7 +169,6 @@ registerService({
   label: "Linear",
   description: "Issues de Linear: los tuyos, buscar y equipos; con permiso completo, crear issues y comentar.",
   category: "tareas",
-  icon: "📐",
   levels: {
     lectura: "Lectura: tus issues, buscar y ver equipos",
     completo: `Completo: además crear issues y comentar (máx. ${linearLimit.max} al día; nunca cierra ni borra)`,

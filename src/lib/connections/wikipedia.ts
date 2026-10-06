@@ -61,7 +61,6 @@ registerService({
   label: "Wikipedia",
   description: "Buscar artículos y leer su resumen para responder con fuente. Gratis y sin claves.",
   category: "info",
-  icon: "📖",
   readOnly: true,
   levels: { lectura: "Lectura: buscar y leer resúmenes", completo: "Completo: igual que lectura" },
   fields: [{ key: "idioma", label: "Idioma", placeholder: "es" }],

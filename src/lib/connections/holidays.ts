@@ -63,7 +63,6 @@ registerService({
   label: "Festivos",
   description: "Festivos oficiales nacionales y de tu comunidad autónoma, para planificar la agenda. Gratis y sin claves.",
   category: "agenda",
-  icon: "🎉",
   readOnly: true,
   levels: { lectura: "Lectura: consultar festivos", completo: "Completo: igual que lectura" },
   fields: [

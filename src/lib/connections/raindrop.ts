@@ -110,7 +110,6 @@ registerService({
   label: "Raindrop.io (marcadores)",
   description: "Tus marcadores y enlaces para leer después (sustituye a Pocket, que cerró en 2025); con permiso completo, guardar enlaces.",
   category: "notas",
-  icon: "💧",
   levels: {
     lectura: "Lectura: buscar marcadores y ver colecciones",
     completo: `Completo: además guardar enlaces (máx. ${raindropLimit.max} al día; nunca borra)`,
