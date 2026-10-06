@@ -1,29 +1,21 @@
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import { defineTool, fail, ok, type ToolContext, type ToolDef } from "../agents/tools";
 import { TIMEZONE } from "../agents/prompt";
-import type { CalendarData, CalendarEvent } from "../panels/types";
-import { getPanel, replacePanelData, type Actor } from "../repo/panels";
-import { markSync, updateConnection, type Connection } from "../repo/connections";
-import { logActivity } from "../repo/system";
+import type { Connection } from "../repo/connections";
 import { redact } from "../secrets";
 import { fetchText } from "./http";
 import { auditor, guard, requireSecret, testWith } from "./kit";
-import { targetPanel } from "./google/sync";
 import { addDays, dateToLocal, daysBetween, isDay, localToDate, todayIn } from "./google/time";
 import { registerService, type AgentGrant } from "./registry";
 
 /**
  * Cualquier calendario por su dirección iCal/ICS (Outlook, iCloud, Google
- * «dirección secreta», Calendly, festivos…). Solo lectura. La dirección va
- * cifrada (las privadas llevan un token). Opcionalmente se vuelca cada 30 min
- * al panel «Calendario» con ids `ics_…`: no duplica y no toca lo demás.
+ * «dirección secreta», Calendly, festivos…). Solo lectura: los agentes lo
+ * consultan con ics_eventos. La dirección va cifrada (las privadas llevan un token).
  */
 
 const SECRET = "dirección del calendario";
-export const SYNC_EVERY_MS = 30 * 60_000;
 const MAX_OCCURRENCES = 2000;
-const SYSTEM_ACTOR: Actor = { by: "sistema" };
 
 // ---------- Lectura del formato iCalendar (RFC 5545), sin dependencias ----------
 
@@ -304,80 +296,6 @@ export async function eventsText(c: Connection, from: string, to: string, text?:
   return [`${list.length} evento(s) en «${c.name}» del ${from} al ${to}:`, ...list.slice(0, 200).map(occurrenceLine)].join("\n");
 }
 
-/** Prefijo de los eventos de esta conexión en el panel. */
-export const idPrefix = (c: Connection) => `ics_${c.id.replace(/-/g, "").slice(0, 8)}_`;
-export const panelId = (c: Connection, o: Occurrence) => `${idPrefix(c)}${createHash("sha1").update(`${o.uid}|${o.start}`).digest("hex").slice(0, 16)}`;
-
-export function toPanelEvent(c: Connection, o: Occurrence): CalendarEvent {
-  const e = { id: panelId(c, o), title: o.title, start: o.start, allDay: o.allDay } as CalendarEvent;
-  if (o.end) e.end = o.end;
-  if (o.location) e.location = o.location;
-  if (o.notes) e.notes = o.notes;
-  return e;
-}
-
-const same = (a: CalendarEvent, b: CalendarEvent) =>
-  a.title === b.title && a.start === b.start && a.end === b.end && Boolean(a.allDay) === Boolean(b.allDay) && a.location === b.location && a.notes === b.notes;
-
-/** Mezcla pura: añade/actualiza por id y quita los de este prefijo en la ventana que ya no vienen. Conserva color. */
-export function mergeIcs(data: CalendarData, incoming: CalendarEvent[], prefix: string, from: string, toExclusive: string) {
-  const byId = new Map(incoming.map((e) => [e.id, e]));
-  let added = 0;
-  let updated = 0;
-  let removed = 0;
-  const seen = new Set<string>();
-  const events: CalendarEvent[] = [];
-  for (const e of data.events) {
-    const n = byId.get(e.id);
-    if (n) {
-      if (seen.has(e.id)) continue;
-      seen.add(e.id);
-      const merged = { ...n, ...(e.color && { color: e.color }) };
-      if (same(e, merged)) events.push(e);
-      else {
-        events.push(merged);
-        updated++;
-      }
-    } else if (e.id.startsWith(prefix) && e.start.slice(0, 10) >= from && e.start.slice(0, 10) < toExclusive) removed++;
-    else events.push(e);
-  }
-  for (const n of byId.values()) {
-    if (seen.has(n.id)) continue;
-    events.push(n);
-    added++;
-  }
-  return { data: { ...data, events }, added, updated, removed };
-}
-
-export async function syncIcs(c: Connection, at = new Date()): Promise<void | false> {
-  if (c.config.panel === false) return false;
-  const saved = c.statusPanelId ? getPanel(c.statusPanelId) : null;
-  if (saved?.archived) {
-    updateConnection(c.id, { config: { ...c.config, panel: false } });
-    logActivity("sistema", `El panel «${saved.title}» está en la papelera: «${c.name}» deja de volcarse (actívalo de nuevo en Conexiones).`);
-    return false;
-  }
-  try {
-    const today = todayIn(TIMEZONE, at);
-    const from = addDays(today, -7);
-    const toExclusive = addDays(today, 61);
-    const list = occurrences(await fetchIcs(c), from, toExclusive);
-    const panel = targetPanel(c, SYSTEM_ACTOR);
-    if (!panel) return false;
-    const r = mergeIcs(getPanel(panel.id)!.data as CalendarData, list.map((o) => toPanelEvent(c, o)), idPrefix(c), from, toExclusive);
-    if (r.added || r.updated || r.removed) {
-      replacePanelData(panel.id, r.data, SYSTEM_ACTOR);
-      logActivity("conexion", `«${c.name}» volcado al panel «${panel.title}»: ${r.added} nuevo(s), ${r.updated} actualizado(s), ${r.removed} quitado(s).`, null, { connectionId: c.id, panelId: panel.id });
-    }
-    markSync(c.id, null, at);
-  } catch (err) {
-    const msg = redact((err as Error).message);
-    if (msg !== c.lastError) logActivity("error", `Conexión «${c.name}»: ${msg}`);
-    markSync(c.id, msg, at);
-    throw new Error(msg);
-  }
-}
-
 function icsTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
   if (!grants.length) return [];
   const names = grants.map((g) => g.connection.name);
@@ -415,7 +333,7 @@ function icsTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
 registerService({
   key: "ics",
   label: "Calendario iCal (URL)",
-  description: "Cualquier calendario por su dirección .ics (Outlook, iCloud, Google, festivos, reservas…). Solo lectura; puede volcarse al panel «Calendario».",
+  description: "Cualquier calendario por su dirección .ics (Outlook, iCloud, Google, festivos, reservas…). Solo lectura: los agentes consultan sus eventos.",
   category: "agenda",
   icon: "🗓️",
   readOnly: true,
@@ -424,16 +342,15 @@ registerService({
   supportsSecret: true,
   secretLabel: "Dirección del calendario (.ics)",
   secretPlaceholder: "https://…/calendar.ics o webcal://…",
-  panelLabel: "Panel «Calendario»",
   steps: [
     "Copia la dirección iCal de tu calendario: Outlook → Configuración → Calendarios compartidos → «Publicar» (ICS); Google → Configuración del calendario → «Dirección secreta en formato iCal»; iCloud → compartir → «Calendario público».",
     "Pon un nombre y pulsa «Añadir»; pega la dirección en la ficha (se guarda cifrada: las privadas llevan una clave).",
-    "Pulsa «Probar conexión»: verás cuántos eventos tiene. Por defecto se vuelca cada 30 min al panel «Calendario» (sin duplicar); desmarca «Al día» si no lo quieres.",
+    "Pulsa «Probar conexión»: verás cuántos eventos tiene.",
     "Da permiso de lectura a los agentes que lleven tu agenda.",
   ],
   normalizeConfig(input) {
     const nombre = String(input.nombre ?? "").trim().slice(0, 60) || "Calendario iCal";
-    return { nombre, panel: input.panel !== false };
+    return { nombre };
   },
   defaultName(config) {
     return String(config.nombre);
@@ -454,6 +371,4 @@ registerService({
       SECRET,
     );
   },
-  sync: syncIcs,
-  syncEveryMs: SYNC_EVERY_MS,
 });
