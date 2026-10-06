@@ -25,3 +25,6 @@ import "./raindrop";
 import "./obsidian";
 import "./webhook-out";
 import "./webhook-in";
+import "./wikipedia";
+import "./holidays";
+import "./uptime";
