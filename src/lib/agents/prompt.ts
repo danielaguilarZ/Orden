@@ -22,7 +22,7 @@ export function todayIso(): string {
 }
 
 /**
- * Secciones que añaden otros módulos (paneles, memoria…).
+ * Secciones que añaden otros módulos (memoria, archivos…).
  * Las estáticas van primero (se reaprovechan en la caché de prompts); las
  * dinámicas (listas que cambian) al final.
  */
@@ -37,7 +37,7 @@ export function registerPromptSection(fn: PromptSection, opts: { dynamic?: boole
  * Prompt de sistema de un agente: SOLO lo que no cambia entre mensajes
  * (identidad, carácter, normas, guías). Al reanudar una sesión el SDK
  * conserva el prompt de sistema original, así que lo que cambia (equipo,
- * hora, paneles, memoria) va en `buildContext`, dentro de cada mensaje.
+ * hora, memoria) va en `buildContext`, dentro de cada mensaje.
  */
 export function buildSystemPrompt(agent: Agent, task: Task): string {
   const preset = getPersonality(agent.personality.preset);
@@ -54,7 +54,7 @@ export function buildSystemPrompt(agent: Agent, task: Task): string {
 - Si un encargo encaja mejor con la especialidad de otro agente, delega con «delegar» (varios a la vez si son independientes) y recoge todo con «esperar_resultados».
 - No inventes datos personales: si te falta algo importante, pregúntalo en tu respuesta final.
 - Tu respuesta final es lo que verá quien te hizo el encargo.
-- Cada mensaje empieza con un bloque <contexto_actual> generado por la app: es la verdad del momento (equipo, fecha, paneles, memoria) y manda sobre lo que recuerdes de mensajes anteriores. No lo menciones ni lo repitas.`,
+- Cada mensaje empieza con un bloque <contexto_actual> generado por la app: es la verdad del momento (equipo, fecha, memoria) y manda sobre lo que recuerdes de mensajes anteriores. No lo menciones ni lo repitas.`,
   ];
   for (const fn of staticSections) parts.push(fn(agent, task) ?? "");
   return parts.filter(Boolean).join("\n\n");

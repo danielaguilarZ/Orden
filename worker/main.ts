@@ -12,7 +12,6 @@ import { runTask } from "../src/lib/agents/runner";
 import "../src/lib/agents/modules";
 import { tickRoutines } from "../src/lib/routines/runner";
 import { refreshUsage } from "../src/lib/claude/usage";
-import { syncDueConnections } from "../src/lib/connections";
 import { ensureFilesSeed } from "../src/lib/files/repo";
 import { dispatchAnswered } from "../src/lib/decisions/repo";
 
@@ -20,8 +19,6 @@ const HEARTBEAT_MS = 10_000;
 const TICK_MS = 400;
 const ROUTINE_TICK_MS = 15_000;
 const USAGE_EVERY_MS = 5 * 60_000;
-/** Cada minuto mira qué conexión toca actualizar (cada una lleva su ritmo, p. ej. 10 min). */
-const CONNECTIONS_TICK_MS = 60_000;
 
 /** Límites de Claude: periódicamente y poco después de cada encargo (no gasta uso). */
 let usageTimer: ReturnType<typeof setTimeout> | null = null;
@@ -109,20 +106,12 @@ function main() {
   routines();
   scheduleUsage(1000);
 
-  // Paneles vivos de las conexiones (p. ej. «Estado del repo»): sin llamar al modelo.
-  const connections = () => {
-    syncDueConnections()
-      .then((names) => names.length && log(`🔗 Actualizado: ${names.join(", ")}`))
-      .catch((err) => log("Error en las conexiones:", err));
-  };
-  setTimeout(connections, 5_000);
   const timers = [
     setInterval(() => scheduleUsage(0), USAGE_EVERY_MS),
     setInterval(heartbeat, HEARTBEAT_MS),
     setInterval(tick, TICK_MS),
     setInterval(routines, ROUTINE_TICK_MS),
     setInterval(() => pruneEvents(), 10 * 60_000),
-    setInterval(connections, CONNECTIONS_TICK_MS),
   ];
 
   const stop = () => {

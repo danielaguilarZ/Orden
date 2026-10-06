@@ -12,7 +12,7 @@ export function routinePrompt(r: Routine): string {
   return `Rutina programada «${r.name}» (${describeSchedule(r.schedule)}).
 ${r.prompt}
 
-Es una ejecución automática: el usuario no está esperando en el chat. Si encaja, deja el resultado en un panel; responde con un resumen breve.`;
+Es una ejecución automática: el usuario no está esperando en el chat. Si el resultado tiene que quedar por escrito, guárdalo como archivo en Archivos/Daily con archivo_escribir (y lo duradero, en la memoria); responde con un resumen breve.`;
 }
 
 /**
