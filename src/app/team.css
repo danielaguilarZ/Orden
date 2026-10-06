@@ -666,15 +666,7 @@
   margin-top: 8px;
 }
 
-/* ───────────── Editor de sala ───────────── */
-
-.room-editor {
-  width: 420px;
-}
-
-.room-editor .drawer-title select {
-  width: 100%;
-}
+/* ───────────── Modo decorar: piezas del inventario ───────────── */
 
 .re-hint {
   margin: 12px 16px 8px;
@@ -687,130 +679,6 @@
   border-radius: 4px;
   background: var(--bg-2);
   font-size: 11px;
-}
-
-.re-stage {
-  padding: 4px 16px 0;
-}
-
-.re-grid {
-  position: relative;
-  margin: 0 auto;
-  touch-action: none;
-  user-select: none;
-}
-
-.re-grid.placing,
-.re-grid.dragging {
-  cursor: crosshair;
-}
-
-.re-cell,
-.re-wall,
-.re-item,
-.re-ghost {
-  position: absolute;
-  box-sizing: border-box;
-}
-
-.re-cell {
-  background: #2b2839;
-  border: 1px solid rgba(255, 255, 255, 0.03);
-}
-
-.re-cell.alt {
-  background: #312d42;
-}
-
-.re-cell.door {
-  background: repeating-linear-gradient(45deg, rgba(232, 176, 74, 0.18) 0 4px, transparent 4px 8px), #2b2839;
-}
-
-.re-wall {
-  background: #4a4560;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-}
-
-.re-wall.off {
-  background: transparent;
-  border: 1px dashed rgba(255, 255, 255, 0.08);
-}
-
-.re-item {
-  display: grid;
-  place-items: center;
-  border-radius: 4px;
-  background: rgba(107, 168, 239, 0.16);
-  border: 1px solid rgba(107, 168, 239, 0.45);
-  cursor: grab;
-  overflow: hidden;
-}
-
-.re-item.l1 {
-  background: rgba(155, 149, 178, 0.18);
-  border-style: dashed;
-}
-
-.re-item.l3 {
-  background: rgba(92, 207, 138, 0.18);
-  border-color: rgba(92, 207, 138, 0.6);
-}
-
-.re-item.manual {
-  border-color: rgba(232, 176, 74, 0.6);
-}
-
-.re-item.sel {
-  border: 2px solid var(--accent);
-  box-shadow: 0 0 0 2px rgba(232, 176, 74, 0.25);
-}
-
-.re-item.lifted {
-  opacity: 0.25;
-}
-
-.re-item img,
-.re-ghost img {
-  max-width: 100%;
-  max-height: 100%;
-  image-rendering: pixelated;
-  pointer-events: none;
-}
-
-.re-ghost {
-  display: grid;
-  place-items: center;
-  z-index: 10;
-  border-radius: 4px;
-  border: 2px dashed var(--ok);
-  background: rgba(92, 207, 138, 0.2);
-  pointer-events: none;
-  opacity: 0.85;
-}
-
-.re-ghost.bad {
-  border-color: var(--bad);
-  background: rgba(239, 107, 107, 0.2);
-}
-
-.re-axes {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-  font-size: 11px;
-}
-
-.re-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  padding: 8px 16px 0;
-}
-
-.re-sel {
-  flex: 1;
-  font-size: 13px;
 }
 
 .re-msg {
@@ -1000,16 +868,216 @@
   white-space: nowrap;
 }
 
-.re-foot {
+/* ───────────── Modo decorar (en la propia sala) ───────────── */
+
+/* Decorando, el living se queda solo con la sala: fuera equipo, barra de encargos y leyenda. */
+.living-stage.decorating .roster,
+.living-stage.decorating .command-bar,
+.living-stage.decorating .legend {
+  display: none;
+}
+
+.living-stage.decorating .agent-ov {
+  opacity: 0.4;
+}
+
+.decor {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.decor-ui {
+  pointer-events: auto;
+}
+
+.decor-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  max-width: calc(100% - 32px);
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: rgba(28, 26, 39, 0.94);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
 }
 
-.re-spacer {
+.decor-bar select {
+  width: auto;
+  max-width: 200px;
+}
+
+.decor-badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(232, 176, 74, 0.16);
+  color: var(--accent);
+  font-family: var(--font-pixel), monospace;
+  font-size: 13px;
+}
+
+.decor-state {
+  color: var(--muted);
+}
+
+.decor-state.dirty {
+  color: var(--warn);
+}
+
+.decor-msgs {
+  position: absolute;
+  top: 62px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  max-width: min(560px, calc(100% - 32px));
+}
+
+.decor-msg {
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(28, 26, 39, 0.92);
+  border: 1px solid var(--border);
+  color: var(--ok);
+  font-size: 12px;
+}
+
+.decor-msg.bad {
+  color: var(--bad);
+}
+
+.decor-msg.warn {
+  color: var(--warn);
+}
+
+/* Barra pequeña encima del mueble elegido (la coloca la escena). */
+.decor-tools {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(28, 26, 39, 0.95);
+  border: 1px solid var(--accent);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.decor-tools-name {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.decor-tools button {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.decor-tools button:hover {
+  background: var(--panel-2);
+}
+
+.decor-tools button.bad:hover {
+  color: var(--bad);
+}
+
+/* Inventario lateral plegable. */
+.decor-inv {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: 316px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  background: rgba(28, 26, 39, 0.95);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.decor-inv.closed {
+  bottom: auto;
+  width: auto;
+}
+
+.decor-inv-toggle {
+  align-self: flex-end;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.decor-inv-toggle:hover {
+  color: var(--text);
+}
+
+.decor-tabs {
+  padding: 0 8px;
+}
+
+.decor-tabs button {
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
+.decor-inv-body {
   flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+
+.decor-inv-body .re-hint {
+  margin: 10px 12px 8px;
+}
+
+.decor-search {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 0 12px 8px;
+}
+
+.decor-inv-body .re-catalog {
+  padding: 0 12px 4px;
+}
+
+.decor-inv-body .re-catalog button {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.decor-inv-body .re-finishes button {
+  cursor: pointer;
 }
 
 /* Medidor de límites de Claude (encima del mueble) */
