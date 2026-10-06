@@ -1,86 +1,136 @@
-/* Conexiones: catálogo compacto con buscador, fichas «Próximamente» y pasos */
+/* Conexiones: ventana (modal) de cada conexión o servicio y sus campos */
 
-.conn-add-bar {
+.modal.conn-modal {
+  width: min(660px, calc(100vw - 32px));
+}
+.conn-modal-head {
+  gap: 12px;
+}
+.conn-modal-title {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  flex-direction: column;
 }
-.conn-add-bar .conn-section {
-  margin: 0;
-}
-.conn-filters {
-  display: flex;
-  gap: 4px;
-}
-.conn-search {
-  width: 180px;
-  padding: 4px 9px;
-  font-size: 13px;
-}
-.conn-catalog {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 6px;
-}
-.conn-pick {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 8px;
-  row-gap: 2px;
-  align-items: center;
-  padding: 7px 9px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-2);
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-}
-.conn-pick-icon {
-  grid-row: span 2;
-  font-size: 18px;
-  width: 24px;
-  text-align: center;
-}
-.conn-pick strong {
-  font-weight: 600;
+.conn-modal-title h2 {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.conn-pick .tag {
-  justify-self: start;
-  font-size: 10px;
+.conn-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-button.conn-pick {
-  cursor: pointer;
+.conn-modal-section {
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
 }
-button.conn-pick:hover {
-  border-color: var(--accent);
+.conn-modal-section > h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
 }
-.conn-pick.on {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+.conn-modal-section > h3 .muted {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }
-.conn-pick.soon {
-  opacity: 0.55;
-  border-style: dashed;
-  cursor: help;
+.conn-modal-foot {
+  align-items: center;
+  flex-wrap: wrap;
 }
-.conn-add-form {
-  margin-top: 10px;
-  padding: 4px 12px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel);
-  animation: fade-up 0.15s ease both;
+.conn-desc {
+  margin: 0;
 }
-.conn-steps {
+.conn-result {
+  margin: 0;
+}
+
+.conn-field {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  align-items: center;
+  gap: 8px;
   margin: 6px 0;
+  font-size: 13px;
+}
+.conn-field > span:first-child {
+  color: var(--muted);
+}
+.conn-field input,
+.conn-field select,
+.conn-row input {
+  padding: 5px 8px;
+}
+.conn-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+.conn-row.end {
+  justify-content: flex-end;
+}
+.conn-row input {
+  flex: 1;
+}
+.conn-token {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.conn-token input {
+  flex: 1;
+  min-width: 160px;
+}
+
+.conn-grants {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 6px;
+}
+.conn-grant {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.conn-grant.on {
+  color: var(--text);
+  border-color: rgba(92, 207, 138, 0.5);
+}
+.conn-grant span {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.conn-grant select {
+  width: auto;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.conn-levels {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  line-height: 1.5;
+}
+
+.conn-steps {
+  margin: 4px 0;
   font-size: 13px;
 }
 .conn-steps > summary {
@@ -95,24 +145,8 @@ button.conn-pick:hover {
   line-height: 1.5;
 }
 
-/* Categorías: filtros y grupos del catálogo */
-.conn-cats {
-  margin-bottom: 8px;
-}
-.conn-group + .conn-group {
-  margin-top: 10px;
-}
-.conn-group-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-.conn-group-title .muted {
-  font-weight: 400;
+@media (max-width: 700px) {
+  .conn-field {
+    grid-template-columns: 1fr;
+  }
 }

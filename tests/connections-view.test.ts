@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { catalogItems, connectionStatus, grantCount, serviceIcon, type ConnView } from "@/lib/connections/view";
+import { catalogItems, connectionSections, connectionStatus, grantCount, serviceMonogram, type ConnView } from "@/lib/connections/view";
 import { UPCOMING_SERVICES } from "@/lib/connections/catalog";
 import type { ServiceInfo } from "@/lib/connections/registry";
 
@@ -56,11 +56,14 @@ describe("connectionStatus", () => {
   });
 });
 
-describe("serviceIcon y grantCount", () => {
-  it("icono conocido o iniciales", () => {
-    expect(serviceIcon("github")).toBe("🐙");
-    expect(serviceIcon("desconocido", "Mi Servicio")).toBe("MS");
-    expect(serviceIcon("x", "Zapier")).toBe("ZA");
+describe("serviceMonogram y grantCount", () => {
+  it("monograma sin emojis: iniciales, mayúscula interior o primera letra", () => {
+    expect(serviceMonogram("github", "GitHub")).toBe("GH");
+    expect(serviceMonogram("google_calendar", "Google Calendar")).toBe("GC");
+    expect(serviceMonogram("clima", "Tiempo (clima)")).toBe("TC");
+    expect(serviceMonogram("drive", "Google Drive / Docs / Sheets")).toBe("GD");
+    expect(serviceMonogram("x", "Zapier")).toBe("Z");
+    expect(serviceMonogram("sin_nombre")).toBe("S");
   });
   it("cuenta agentes con permiso", () => {
     expect(grantCount({ grants: { a: "lectura", b: "completo" } })).toBe(2);
@@ -83,5 +86,42 @@ describe("catalogItems", () => {
   it("busca sin tildes ni mayúsculas, también en la descripción", () => {
     expect(catalogItems(services, UPCOMING_SERVICES, "PREVISION").map((i) => i.key)).toEqual(["clima"]);
     expect(catalogItems(services, UPCOMING_SERVICES, "gmail", "disponibles")).toEqual([]);
+  });
+});
+
+describe("connectionSections", () => {
+  const services = [
+    svc(),
+    svc({ key: "clima", label: "Tiempo (clima)", description: "Previsión", supportsSecret: false }),
+    svc({ key: "github", label: "GitHub", description: "Repos", category: "dev" }),
+  ];
+  const conns = [conn({ id: "b", name: "Zeta", service: "notion" }), conn({ id: "a", name: "Alfa", service: "github", hasSecret: false, auth: "token" })];
+
+  it("activas arriba (por nombre, con estado), disponibles con su recuento y próximamente aparte", () => {
+    const s = connectionSections(services, conns, UPCOMING_SERVICES);
+    expect(s.activas.map((a) => a.conn.name)).toEqual(["Alfa", "Zeta"]);
+    expect(s.activas.map((a) => a.status.tone)).toEqual(["warn", "ok"]);
+    expect(s.activas[0].monogram).toBe("GH");
+    expect(s.disponibles.every((d) => d.available)).toBe(true);
+    expect(s.disponibles.find((d) => d.key === "notion")!.connected).toBe(1);
+    expect(s.disponibles.find((d) => d.key === "clima")!.connected).toBe(0);
+    expect(s.proximamente).toHaveLength(UPCOMING_SERVICES.length);
+    expect(s.proximamente.every((p) => !p.available && p.tag === "Próximamente")).toBe(true);
+  });
+
+  it("disponibles y próximamente, por categoría y nombre", () => {
+    const s = connectionSections(services, [], UPCOMING_SERVICES);
+    // notas (Notion) → info (Tiempo) → dev (GitHub), según el orden de CATEGORIES.
+    expect(s.disponibles.map((d) => d.key)).toEqual(["notion", "clima", "github"]);
+    expect(s.proximamente[0].key).toBe("google_tasks");
+  });
+
+  it("el buscador filtra las tres secciones (sin tildes)", () => {
+    const s = connectionSections(services, conns, UPCOMING_SERVICES, "zeta");
+    expect(s.activas.map((a) => a.conn.id)).toEqual(["b"]);
+    expect(s.disponibles).toEqual([]);
+    const t = connectionSections(services, conns, UPCOMING_SERVICES, "PREVISIÓN");
+    expect(t.activas).toEqual([]);
+    expect(t.disponibles.map((d) => d.key)).toEqual(["clima"]);
   });
 });

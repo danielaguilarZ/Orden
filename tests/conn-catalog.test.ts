@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { listServices } from "@/lib/connections";
 import { serviceInfo } from "@/lib/connections/registry";
 import { CATEGORIES, UPCOMING_SERVICES } from "@/lib/connections/catalog";
-import { catalogItems, categoryCounts, groupCatalog, serviceCategory } from "@/lib/connections/view";
+import { catalogItems, connectionSections, serviceCategory } from "@/lib/connections/view";
 import { connect, team, toolsOf, useConnTestEnv } from "./helpers/conn";
 
 useConnTestEnv();
@@ -35,13 +35,12 @@ const CONFIGS: Record<string, Record<string, unknown>> = {
 };
 
 describe("catálogo de conexiones", () => {
-  it("todas las nuevas están, con categoría válida, icono y al menos 3 pasos", () => {
+  it("todas las nuevas están, con categoría válida y al menos 3 pasos", () => {
     const services = listServices().map(serviceInfo);
     const keys = services.map((s) => s.key);
     for (const k of Object.keys(CONFIGS)) expect(keys).toContain(k);
     for (const s of services.filter((x) => CONFIGS[x.key])) {
       expect(CATEGORIES.map((c) => c.key)).toContain(s.category);
-      expect(s.icon, s.key).toBeTruthy();
       expect(s.steps!.length, s.key).toBeGreaterThanOrEqual(3);
       expect(s.levels.lectura && s.levels.completo, s.key).toBeTruthy();
     }
@@ -53,15 +52,29 @@ describe("catálogo de conexiones", () => {
     expect(serviceCategory("nuevo", "inventada")).toBe("otros");
   });
 
-  it("agrupa y cuenta por categoría en el orden fijo", () => {
-    const items = catalogItems(listServices().map(serviceInfo), UPCOMING_SERVICES);
-    const groups = groupCatalog(items);
-    expect(groups.map((g) => g.key)).toEqual(CATEGORIES.map((c) => c.key).filter((k) => groups.some((g) => g.key === k)));
-    expect(groups.reduce((n, g) => n + g.items.length, 0)).toBe(items.length);
-    const avisos = catalogItems(listServices().map(serviceInfo), UPCOMING_SERVICES, "", "disponibles", "avisos").map((i) => i.key);
+  it("ordena por categoría en el orden fijo y filtra por categoría", () => {
+    const services = listServices().map(serviceInfo);
+    const { disponibles, proximamente } = connectionSections(services, [], UPCOMING_SERVICES);
+    expect(disponibles).toHaveLength(services.length);
+    for (const list of [disponibles, proximamente]) {
+      const order = list.map((it) => CATEGORIES.findIndex((c) => c.key === it.category));
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    }
+    const avisos = catalogItems(services, UPCOMING_SERVICES, "", "disponibles", "avisos").map((i) => i.key);
     expect(avisos).toEqual(expect.arrayContaining(["telegram", "discord", "slack", "ntfy", "pushover"]));
     expect(avisos).not.toContain("whatsapp");
-    expect(categoryCounts(items).find((c) => c.key === "finanzas")!.count).toBeGreaterThanOrEqual(3);
+    expect(disponibles.filter((c) => c.category === "finanzas").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("sin emojis: categorías, nombres y monogramas solo con letras y números", () => {
+    const emoji = /\p{Extended_Pictographic}/u;
+    const items = catalogItems(listServices().map(serviceInfo), UPCOMING_SERVICES);
+    for (const c of CATEGORIES) expect(c.label, c.key).not.toMatch(emoji);
+    for (const it of items) {
+      expect(`${it.label} ${it.tag}`, it.key).not.toMatch(emoji);
+      expect(it.monogram, it.key).toMatch(/^[\p{Lu}\d]{1,2}$/u);
+    }
+    for (const s of listServices()) expect("icon" in s, s.key).toBe(false);
   });
 
   it("con todo conectado, ningún nombre de herramienta se repite", () => {

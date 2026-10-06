@@ -35,8 +35,6 @@ export interface ServiceInfo {
   secretOptional?: boolean;
   /** Categoría del catálogo (ver CATEGORIES en catalog.ts). */
   category?: string;
-  /** Icono (emoji) del servicio. */
-  icon?: string;
 }
 
 /** Estado OAuth que ve la interfaz (sin secretos). */
@@ -93,6 +91,5 @@ export function serviceInfo(s: ConnectionService): ServiceInfo {
     secretPlaceholder: s.secretPlaceholder,
     secretOptional: Boolean(s.secretOptional),
     category: s.category,
-    icon: s.icon,
   };
 }

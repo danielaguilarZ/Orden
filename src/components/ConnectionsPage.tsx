@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, onEvent, useStore } from "@/client/store";
 import type { ServiceInfo } from "@/lib/connections/registry";
 import { UPCOMING_SERVICES } from "@/lib/connections/catalog";
-import { catalogItems, categoryCounts, connectionStatus, grantCount, groupCatalog, serviceIcon, type CatalogFilter, type CatalogItem, type ConnView } from "@/lib/connections/view";
+import { categoryLabel, connectionSections, connectionStatus, grantCount, serviceCategory, serviceMonogram, type CatalogItem, type ConnView, type StatusTone } from "@/lib/connections/view";
 import type { AuthMode, GrantLevel } from "@/lib/repo/connections";
-import { MoreMenu, type MenuItem } from "./ui/MoreMenu";
-import { FilterChips, SearchBox } from "./ui/kit";
+import { Backdrop } from "./Backdrop";
+import { SearchBox } from "./ui/kit";
 
 type Accion = "probar" | "autorizar" | "desconectar";
 
@@ -15,6 +15,9 @@ interface Data {
   services: ServiceInfo[];
   connections: ConnView[];
 }
+
+/** Qué ventana está abierta: una conexión, un servicio para añadir o uno que vendrá. */
+type Abierta = { tipo: "conexion"; id: string } | { tipo: "nueva"; key: string } | { tipo: "pronto"; key: string };
 
 /** Valor de configuración como texto (las listas, separadas por comas). */
 const fieldText = (v: unknown) => (Array.isArray(v) ? v.join(", ") : String(v ?? ""));
@@ -25,11 +28,19 @@ const AUTH_LABEL: Record<AuthMode, string> = {
   token: "Solo token",
 };
 
-/** Conexiones con servicios externos (GitHub…) y permisos de cada agente. */
+const GITHUB_TOKEN_HINT = "Token fine-grained limitado al repo: Contents, Issues y Pull requests (lectura y escritura) y Metadata (lectura).";
+
+/**
+ * Conexiones con servicios externos: tarjetas del mismo tamaño en tres
+ * secciones (activas, disponibles y próximamente). Al pulsar una tarjeta se
+ * abre su ventana con todo lo que necesita (campos, credenciales y permisos).
+ */
 export function ConnectionsPage() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [query, setQuery] = useState("");
+  const [abierta, setAbierta] = useState<Abierta | null>(null);
   const load = useCallback(() => api<Data>("/api/connections").then(setData, (e: Error) => setError(e.message)), []);
 
   useEffect(() => {
@@ -49,43 +60,200 @@ export function ConnectionsPage() {
     });
   }, [load]);
 
+  const sections = useMemo(() => (data ? connectionSections(data.services, data.connections, UPCOMING_SERVICES, query) : null), [data, query]);
+  const close = useCallback(() => setAbierta(null), []);
+
+  const conn = abierta?.tipo === "conexion" ? data?.connections.find((c) => c.id === abierta.id) : undefined;
+  const nueva = abierta?.tipo === "nueva" ? data?.services.find((s) => s.key === abierta.key) : undefined;
+  const pronto = abierta?.tipo === "pronto" ? sections?.proximamente.find((u) => u.key === abierta.key) : undefined;
+
   return (
     <div className="board connections">
       <div className="board-bar">
         <h1>Conexiones</h1>
         <span className="muted">Servicios que pueden usar los agentes.</span>
+        <span style={{ flex: 1 }} />
+        <SearchBox value={query} onChange={setQuery} placeholder="Buscar servicio…" />
       </div>
       {error && <p className="bad-text">{error}</p>}
-      {notice && <p className={`conn-result ${notice.ok ? "ok-text" : "bad-text"}`}>{notice.text}</p>}
+      {notice && <p className={`conn-notice ${notice.ok ? "ok-text" : "bad-text"}`}>{notice.text}</p>}
       {!data && !error && <p className="muted">Cargando…</p>}
-      {data && (
+      {sections && (
         <>
-          <h3 className="conn-section">Activas{data.connections.length > 0 && <span className="conn-count">{data.connections.length}</span>}</h3>
-          {data.connections.length === 0 ? (
-            <p className="muted small">Ninguna todavía. Añade una abajo.</p>
-          ) : (
-            <div className="conn-list">
-              {data.connections.map((c) => (
-                <ConnectionRow key={c.id} conn={c} service={data.services.find((s) => s.key === c.service)} onChange={load} />
-              ))}
-            </div>
-          )}
-          <AddConnection services={data.services} onAdded={load} />
+          <ConnSection title="Activas" count={sections.activas.length} empty={query ? "Ninguna activa coincide." : "Ninguna todavía: elige una de las disponibles."}>
+            {sections.activas.map((a) => (
+              <ConnCard
+                key={a.conn.id}
+                tone={a.status.tone}
+                monogram={a.monogram}
+                title={a.conn.name}
+                subtitle={a.service && a.service.label !== a.conn.name ? a.service.label : categoryLabel(serviceCategory(a.conn.service, a.service?.category))}
+                description={a.service?.description}
+                onClick={() => setAbierta({ tipo: "conexion", id: a.conn.id })}
+                foot={
+                  <>
+                    <span className={`conn-status ${a.status.tone}`} title={a.conn.lastError ?? undefined}>
+                      <span className="dot" />
+                      {a.status.label}
+                    </span>
+                    <span className="muted">{agentsText(grantCount(a.conn))}</span>
+                  </>
+                }
+              />
+            ))}
+          </ConnSection>
+
+          <ConnSection title="Disponibles" count={sections.disponibles.length} empty="Nada coincide.">
+            {sections.disponibles.map((it) => (
+              <ConnCard
+                key={it.key}
+                monogram={it.monogram}
+                title={it.label}
+                subtitle={categoryLabel(it.category)}
+                description={it.description}
+                onClick={() => setAbierta({ tipo: "nueva", key: it.key })}
+                foot={
+                  <>
+                    <span className="tag">{it.tag}</span>
+                    {it.connected > 0 && <span className="muted">{it.connected === 1 ? "1 activa" : `${it.connected} activas`}</span>}
+                  </>
+                }
+              />
+            ))}
+          </ConnSection>
+
+          <ConnSection title="Próximamente" count={sections.proximamente.length} empty="Nada coincide." soon>
+            {sections.proximamente.map((it) => (
+              <ConnCard
+                key={it.key}
+                soon
+                monogram={it.monogram}
+                title={it.label}
+                subtitle={categoryLabel(it.category)}
+                description={it.description}
+                onClick={() => setAbierta({ tipo: "pronto", key: it.key })}
+                foot={<span className="tag">Próximamente</span>}
+              />
+            ))}
+          </ConnSection>
         </>
       )}
+
+      {conn && <ConnectionModal key={conn.id} conn={conn} service={data?.services.find((s) => s.key === conn.service)} onClose={close} onChange={load} />}
+      {nueva && (
+        <AddModal
+          service={nueva}
+          onClose={close}
+          onAdded={async (id) => {
+            await load();
+            setAbierta({ tipo: "conexion", id });
+          }}
+        />
+      )}
+      {pronto && <UpcomingModal item={pronto} onClose={close} />}
     </div>
   );
 }
 
-/** Fila compacta: icono, nombre, estado y una acción; lo demás, plegado o en «⋯». */
-function ConnectionRow({ conn, service, onChange }: { conn: ConnView; service?: ServiceInfo; onChange: () => void }) {
-  const [open, setOpen] = useState<"" | "ajustes" | "permisos">("");
+const agentsText = (n: number) => (n === 0 ? "Sin agentes" : n === 1 ? "1 agente" : `${n} agentes`);
+
+/** Sección de la pestaña: título, contador y cuadrícula uniforme de tarjetas. */
+function ConnSection({ title, count, empty, soon, children }: { title: string; count: number; empty: string; soon?: boolean; children: ReactNode }) {
+  return (
+    <section className={`conn-block${soon ? " soon" : ""}`}>
+      <h3 className="conn-section">
+        {title}
+        <span className="conn-count">{count}</span>
+      </h3>
+      {count === 0 ? <p className="muted small">{empty}</p> : <div className="conn-grid">{children}</div>}
+    </section>
+  );
+}
+
+/** Tarjeta de tamaño fijo: monograma, nombre, subtítulo, dos líneas de descripción y pie. */
+function ConnCard({
+  monogram,
+  title,
+  subtitle,
+  description,
+  foot,
+  tone,
+  soon,
+  onClick,
+}: {
+  monogram: string;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  foot: ReactNode;
+  /** Solo las activas: contorno según su estado (verde si funciona). */
+  tone?: StatusTone;
+  soon?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className={`conn-card${tone ? ` active tone-${tone}` : ""}${soon ? " soon" : ""}`} onClick={onClick} title={description}>
+      <span className="conn-card-head">
+        <span className="conn-mono" aria-hidden>
+          {monogram}
+        </span>
+        <span className="conn-card-title">
+          <strong>{title}</strong>
+          {subtitle && <small>{subtitle}</small>}
+        </span>
+      </span>
+      <span className="conn-card-desc">{description}</span>
+      <span className="conn-card-foot">{foot}</span>
+    </button>
+  );
+}
+
+/** Ventana común de la pestaña: cabecera con monograma y botón de cerrar. */
+function ConnModal({ monogram, title, subtitle, side, onClose, children, foot }: { monogram: string; title: string; subtitle?: ReactNode; side?: ReactNode; onClose: () => void; children: ReactNode; foot: ReactNode }) {
+  return (
+    <Backdrop onClick={onClose}>
+      <div className="modal conn-modal" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+        <header className="modal-head conn-modal-head">
+          <span className="conn-mono big" aria-hidden>
+            {monogram}
+          </span>
+          <div className="conn-modal-title">
+            <h2>{title}</h2>
+            {subtitle && <small className="muted">{subtitle}</small>}
+          </div>
+          {side}
+          <button type="button" className="icon-btn" aria-label="Cerrar" onClick={onClose}>
+            ×
+          </button>
+        </header>
+        <div className="conn-modal-body">{children}</div>
+        <footer className="modal-foot conn-modal-foot">{foot}</footer>
+      </div>
+    </Backdrop>
+  );
+}
+
+/** Pasos para conectarla (desplegados si aún falta configurarla). */
+function Steps({ steps, open }: { steps?: string[]; open?: boolean }) {
+  if (!steps?.length) return null;
+  return (
+    <details className="conn-steps" open={open}>
+      <summary>Cómo conectarla</summary>
+      <ol>
+        {steps.map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
+/** Ventana de una conexión activa: nombre, configuración, credenciales, permisos y acciones. */
+function ConnectionModal({ conn, service, onClose, onChange }: { conn: ConnView; service?: ServiceInfo; onClose: () => void; onChange: () => void }) {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState("");
   const oauth = service?.authKind === "oauth";
   const status = connectionStatus(conn, service);
-  const granted = grantCount(conn);
-  const toggle = (k: "ajustes" | "permisos") => setOpen(open === k ? "" : k);
 
   const patch = async (b: Record<string, unknown>) => {
     setResult(null);
@@ -117,110 +285,188 @@ function ConnectionRow({ conn, service, onChange }: { conn: ConnView; service?: 
   };
   const remove = async () => {
     if (!confirm(`¿Eliminar la conexión «${conn.name}»? Los agentes perderán el acceso.`)) return;
-    await api(`/api/connections/${conn.id}`, { method: "DELETE" });
-    onChange();
+    try {
+      await api(`/api/connections/${conn.id}`, { method: "DELETE" });
+      onClose();
+      onChange();
+    } catch (e) {
+      setResult({ ok: false, text: (e as Error).message });
+    }
   };
 
-  // Acción principal: lo que haga falta para que funcione; si ya funciona, probarla.
-  const primary =
-    status.needsSetup ? (
-      <button className="btn small primary" onClick={() => setOpen("ajustes")}>
-        Configurar
-      </button>
-    ) : oauth && conn.enabled && !conn.oauth?.authorized ? (
-      <button className="btn small primary" disabled={busy !== ""} onClick={() => action("autorizar")}>
-        {busy === "autorizar" ? "Abriendo…" : "Autorizar"}
-      </button>
-    ) : (
-      <button className="btn small" disabled={busy !== ""} onClick={() => action("probar")}>
-        {busy === "probar" ? "Probando…" : "Probar"}
-      </button>
-    );
-
-  const menu: MenuItem[] = [
-    { label: open === "ajustes" ? "Ocultar ajustes" : "Ajustes", onClick: () => toggle("ajustes") },
-    { label: open === "permisos" ? "Ocultar permisos" : "Permisos de agentes", onClick: () => toggle("permisos") },
-    ...(status.needsSetup || (oauth && !conn.oauth?.authorized) ? [{ label: "Probar conexión", onClick: () => action("probar"), disabled: busy !== "" }] : []),
-    ...(oauth && conn.oauth?.authorized ? [{ label: "Volver a autorizar", onClick: () => action("autorizar"), disabled: busy !== "" }] : []),
-    { label: conn.enabled ? "Pausar" : "Activar", onClick: () => patch({ enabled: !conn.enabled }) },
-    ...(oauth && conn.oauth?.authorized ? [{ label: "Desconectar Google", onClick: () => action("desconectar"), danger: true }] : []),
-    { label: "Eliminar", onClick: remove, danger: true },
-  ];
-
   return (
-    <section className={`conn-item ${conn.enabled ? "" : "off"} ${open ? "open" : ""}`}>
-      <div className="conn-line">
-        <span className="conn-logo" aria-hidden>
-          {serviceIcon(conn.service, service?.label, service?.icon)}
-        </span>
-        <button type="button" className="conn-name" aria-expanded={open === "ajustes"} onClick={() => toggle("ajustes")} title={service?.description}>
-          <strong>{conn.name}</strong>
-          {service && service.label !== conn.name && <small className="muted">{service.label}</small>}
-        </button>
+    <ConnModal
+      monogram={serviceMonogram(conn.service, service?.label ?? conn.name)}
+      title={conn.name}
+      subtitle={service && service.label !== conn.name ? service.label : undefined}
+      side={
         <span className={`conn-status ${status.tone}`} title={conn.lastError ?? undefined}>
           <span className="dot" />
           {busy ? <span className="spinner" /> : status.label}
         </span>
-        <button type="button" className={`conn-chip ${open === "permisos" ? "on" : ""}`} aria-expanded={open === "permisos"} onClick={() => toggle("permisos")} title="Permisos de agentes">
-          👥 {granted}
-        </button>
-        {primary}
-        <MoreMenu items={menu} />
-      </div>
+      }
+      onClose={onClose}
+      foot={
+        <>
+          <button type="button" className="btn ghost danger" onClick={remove}>
+            Eliminar
+          </button>
+          <span style={{ flex: 1 }} />
+          {oauth && conn.oauth?.authorized && (
+            <button type="button" className="btn ghost danger" disabled={busy !== ""} onClick={() => action("desconectar")}>
+              Desconectar Google
+            </button>
+          )}
+          <button type="button" className="btn ghost" onClick={() => patch({ enabled: !conn.enabled })}>
+            {conn.enabled ? "Pausar" : "Activar"}
+          </button>
+          <button type="button" className="btn primary" disabled={busy !== ""} onClick={() => action("probar")}>
+            {busy === "probar" ? "Probando…" : "Probar conexión"}
+          </button>
+        </>
+      }
+    >
       {result && <p className={`conn-result small ${result.ok ? "ok-text" : "bad-text"}`}>{result.text}</p>}
-      {open === "ajustes" && <ConnectionSettings conn={conn} service={service} busy={busy} showSteps={status.needsSetup} patch={patch} action={action} />}
-      {open === "permisos" && <ConnectionGrants conn={conn} service={service} patch={patch} />}
-    </section>
+      {service?.description && <p className="muted small conn-desc">{service.description}</p>}
+      <Steps steps={service?.steps} open={status.needsSetup} />
+
+      <div className="conn-modal-section">
+        <h3>Configuración</h3>
+        <NameField conn={conn} patch={patch} />
+        <ConfigFields conn={conn} service={service} patch={patch} />
+      </div>
+
+      {(service?.supportsSecret || oauth || conn.service === "github") && (
+        <div className="conn-modal-section">
+          <h3>Acceso</h3>
+          <Credentials conn={conn} service={service} busy={busy} patch={patch} action={action} />
+        </div>
+      )}
+
+      <div className="conn-modal-section">
+        <h3>
+          Permisos de los agentes <span className="muted">{agentsText(grantCount(conn))}</span>
+        </h3>
+        <Grants conn={conn} service={service} patch={patch} />
+      </div>
+
+      {conn.lastError && <p className="bad-text small">Último error: {conn.lastError}</p>}
+    </ConnModal>
   );
 }
 
-function ConnectionSettings({
-  conn,
-  service,
-  busy,
-  showSteps,
-  patch,
-  action,
-}: {
-  conn: ConnView;
-  service?: ServiceInfo;
-  busy: string;
-  /** Falta configurarla: los pasos salen desplegados. */
-  showSteps: boolean;
-  patch: (b: Record<string, unknown>) => Promise<void>;
-  action: (a: Accion) => Promise<void>;
-}) {
-  const [token, setToken] = useState("");
-  const [client, setClient] = useState({ clientId: "", clientSecret: "" });
-  const [config, setConfig] = useState<Record<string, string>>(() => Object.fromEntries((service?.fields ?? []).map((f) => [f.key, fieldText(conn.config[f.key])])));
-  const oauth = service?.authKind === "oauth";
-  const dirty = (service?.fields ?? []).some((f) => config[f.key] !== fieldText(conn.config[f.key]));
-
+/** Nombre de la conexión: se guarda al salir del campo o con Intro. */
+function NameField({ conn, patch }: { conn: ConnView; patch: (b: Record<string, unknown>) => Promise<void> }) {
+  const [name, setName] = useState(conn.name);
+  const commit = () => {
+    const n = name.trim();
+    if (!n) setName(conn.name);
+    else if (n !== conn.name) patch({ name: n });
+  };
   return (
-    <div className="conn-body">
-      {service?.description && <p className="muted small conn-desc">{service.description}</p>}
-      {Boolean(service?.steps?.length) && (
-        <details className="conn-steps" open={showSteps}>
-          <summary>Cómo conectarla</summary>
-          <ol>
-            {service!.steps!.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ol>
-        </details>
-      )}
+    <label className="conn-field">
+      <span>Nombre</span>
+      <input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()} />
+    </label>
+  );
+}
 
-      {(service?.fields ?? []).map((f) => (
+/** Campos propios del servicio (URL, repo, temas…), con «Guardar» si hay cambios. */
+function ConfigFields({ conn, service, patch }: { conn: ConnView; service?: ServiceInfo; patch: (b: Record<string, unknown>) => Promise<void> }) {
+  const fields = service?.fields ?? [];
+  const [config, setConfig] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, fieldText(conn.config[f.key])])));
+  const dirty = fields.some((f) => config[f.key] !== fieldText(conn.config[f.key]));
+  if (fields.length === 0) return null;
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (dirty) patch({ config });
+      }}
+    >
+      {fields.map((f) => (
         <label key={f.key} className="conn-field">
           <span>{f.label}</span>
           <input value={config[f.key] ?? ""} placeholder={f.placeholder} onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })} />
         </label>
       ))}
       {dirty && (
-        <div className="conn-row">
-          <button className="btn small primary" onClick={() => patch({ config })}>
-            Guardar
+        <div className="conn-row end">
+          <button type="button" className="btn small ghost" onClick={() => setConfig(Object.fromEntries(fields.map((f) => [f.key, fieldText(conn.config[f.key])])))}>
+            Descartar
           </button>
+          <button className="btn small primary">Guardar cambios</button>
+        </div>
+      )}
+    </form>
+  );
+}
+
+/** Credenciales: modo de acceso (GitHub), token cifrado o cliente OAuth y autorización (Google). */
+function Credentials({
+  conn,
+  service,
+  busy,
+  patch,
+  action,
+}: {
+  conn: ConnView;
+  service?: ServiceInfo;
+  busy: string;
+  patch: (b: Record<string, unknown>) => Promise<void>;
+  action: (a: Accion) => Promise<void>;
+}) {
+  const [token, setToken] = useState("");
+  const [client, setClient] = useState({ clientId: "", clientSecret: "" });
+  const oauth = service?.authKind === "oauth";
+
+  return (
+    <>
+      {!oauth && conn.service === "github" && (
+        <label className="conn-field">
+          <span>Cómo entra</span>
+          <select value={conn.auth} onChange={(e) => patch({ auth: e.target.value })}>
+            {(Object.keys(AUTH_LABEL) as AuthMode[]).map((k) => (
+              <option key={k} value={k}>
+                {AUTH_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {service?.supportsSecret && (
+        <div className="conn-field">
+          <span>
+            {service.secretLabel ?? "Token"}
+            {service.secretOptional && <small className="muted"> (opcional)</small>}
+          </span>
+          <form
+            className="conn-token"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!token.trim()) return;
+              patch({ token }).then(() => setToken(""));
+            }}
+          >
+            {conn.hasSecret && <span className="tag gold">Guardado {conn.secretHint}</span>}
+            <input
+              type="password"
+              autoComplete="off"
+              value={token}
+              title={conn.service === "github" ? GITHUB_TOKEN_HINT : undefined}
+              placeholder={conn.hasSecret ? "Sustituir…" : (service.secretPlaceholder ?? "Pega aquí la credencial")}
+              onChange={(e) => setToken(e.target.value)}
+            />
+            <button className="btn small" disabled={!token.trim()}>
+              Guardar
+            </button>
+            {conn.hasSecret && (
+              <button type="button" className="btn ghost small danger" onClick={() => patch({ token: null })}>
+                Borrar
+              </button>
+            )}
+          </form>
         </div>
       )}
 
@@ -248,7 +494,7 @@ function ConnectionSettings({
             <span>Cuenta</span>
             <span className="conn-token">
               {conn.oauth.authorized ? <span className="tag gold">Autorizada{conn.oauth.account ? ` · ${conn.oauth.account}` : ""}</span> : <span className="muted small">Sin autorizar</span>}
-              <button className="btn small primary" disabled={busy !== "" || !conn.oauth.clientConfigured} onClick={() => action("autorizar")}>
+              <button type="button" className="btn small primary" disabled={busy !== "" || !conn.oauth.clientConfigured} onClick={() => action("autorizar")}>
                 {busy === "autorizar" ? "Abriendo Google…" : conn.oauth.authorized ? "Volver a autorizar" : "Autorizar con Google"}
               </button>
             </span>
@@ -258,63 +504,15 @@ function ConnectionSettings({
           </p>
         </>
       )}
-
-      {!oauth && conn.service === "github" && (
-        <label className="conn-field">
-          <span>Cómo entra</span>
-          <select value={conn.auth} onChange={(e) => patch({ auth: e.target.value })}>
-            {(Object.keys(AUTH_LABEL) as AuthMode[]).map((k) => (
-              <option key={k} value={k}>
-                {AUTH_LABEL[k]}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {service?.supportsSecret && (
-        <div className="conn-field">
-          <span>
-            {service.secretLabel ?? "Token"}
-            {service.secretOptional && <small className="muted"> (opcional)</small>}
-          </span>
-          <form
-            className="conn-token"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!token.trim()) return;
-              patch({ token }).then(() => setToken(""));
-            }}
-          >
-            {conn.hasSecret && <span className="tag gold">Guardado {conn.secretHint}</span>}
-            <input
-              type="password"
-              autoComplete="off"
-              value={token}
-              title={conn.service === "github" ? "Token fine-grained limitado al repo: Contents, Issues y Pull requests (lectura y escritura) y Metadata (lectura)." : undefined}
-              placeholder={conn.hasSecret ? "Sustituir…" : (service.secretPlaceholder ?? "github_pat_…")}
-              onChange={(e) => setToken(e.target.value)}
-            />
-            <button className="btn small" disabled={!token.trim()}>
-              Guardar
-            </button>
-            {conn.hasSecret && (
-              <button type="button" className="btn ghost small danger" onClick={() => patch({ token: null })}>
-                Borrar
-              </button>
-            )}
-          </form>
-        </div>
-      )}
-
-      {conn.lastError && <p className="bad-text small">{conn.lastError}</p>}
-    </div>
+    </>
   );
 }
 
-function ConnectionGrants({ conn, service, patch }: { conn: ConnView; service?: ServiceInfo; patch: (b: Record<string, unknown>) => Promise<void> }) {
+/** Nivel de acceso de cada agente y qué permite cada nivel. */
+function Grants({ conn, service, patch }: { conn: ConnView; service?: ServiceInfo; patch: (b: Record<string, unknown>) => Promise<void> }) {
   const agents = useStore((s) => s.agents);
   return (
-    <div className="conn-body">
+    <>
       <div className="conn-grants">
         {agents.map((a) => (
           <label key={a.id} className={`conn-grant ${conn.grants[a.id] ? "on" : ""}`}>
@@ -328,129 +526,142 @@ function ConnectionGrants({ conn, service, patch }: { conn: ConnView; service?: 
         ))}
       </div>
       {service && (
-        <details className="conn-steps">
-          <summary>Qué permite cada nivel</summary>
-          <ul className="muted small conn-levels">
-            <li>{service.levels.lectura}</li>
-            {!service.readOnly && <li>{service.levels.completo}</li>}
-          </ul>
-        </details>
+        <ul className="muted small conn-levels">
+          <li>
+            <strong>Lectura:</strong> {service.levels.lectura}
+          </li>
+          {!service.readOnly && (
+            <li>
+              <strong>Completo:</strong> {service.levels.completo}
+            </li>
+          )}
+        </ul>
       )}
-    </div>
+    </>
   );
 }
 
-const FILTERS: { key: CatalogFilter; label: string }[] = [
-  { key: "todas", label: "Todas" },
-  { key: "disponibles", label: "Disponibles" },
-  { key: "proximamente", label: "Próximamente" },
-];
-
-/** Catálogo compacto con buscador: las disponibles se eligen y se añaden; las que vendrán, solo se ven. */
-function AddConnection({ services, onAdded }: { services: ServiceInfo[]; onAdded: () => void }) {
-  const [service, setService] = useState("");
+/**
+ * Ventana para añadir un servicio: sus campos y, si los usa, la credencial o
+ * el cliente OAuth. Al conectarla se abre su ventana para dar permisos.
+ */
+function AddModal({ service, onClose, onAdded }: { service: ServiceInfo; onClose: () => void; onAdded: (id: string) => Promise<void> }) {
   const [config, setConfig] = useState<Record<string, string>>({});
+  const [token, setToken] = useState("");
+  const [client, setClient] = useState({ clientId: "", clientSecret: "" });
   const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<CatalogFilter>("todas");
-  const [category, setCategory] = useState("todas");
-  const s = services.find((x) => x.key === service);
-  // Los contadores de categoría respetan el buscador y el tipo, no la propia categoría.
-  const base = catalogItems(services, UPCOMING_SERVICES, query, filter);
-  const items = category === "todas" ? base : base.filter((it) => it.category === category);
-  const groups = groupCatalog(items);
-  const pick = (x: CatalogItem) =>
-    x.available ? (
-      <button
-        key={x.key}
-        type="button"
-        className={`conn-pick ${service === x.key ? "on" : ""}`}
-        title={x.description}
-        onClick={() => {
-          setService(service === x.key ? "" : x.key);
-          setConfig({});
-          setError("");
-        }}
-      >
-        <span className="conn-pick-icon" aria-hidden>
-          {x.icon}
-        </span>
-        <strong>{x.label}</strong>
-        <span className="tag">{x.tag}</span>
-      </button>
-    ) : (
-      <div key={x.key} className="conn-pick soon" title={`${x.description}\n${x.plan ?? ""}`}>
-        <span className="conn-pick-icon" aria-hidden>
-          {x.icon}
-        </span>
-        <strong>{x.label}</strong>
-        <span className="tag">{x.tag}</span>
-      </div>
-    );
+  const [busy, setBusy] = useState(false);
+  const oauth = service.authKind === "oauth";
+
+  const submit = async () => {
+    setError("");
+    setBusy(true);
+    try {
+      const conn = await api<ConnView>("/api/connections", { method: "POST", json: { service: service.key, config } });
+      // La credencial va aparte (cifrada); si falla, la conexión ya existe y se completa en su ventana.
+      if (service.supportsSecret && token.trim()) await api(`/api/connections/${conn.id}`, { method: "PATCH", json: { token } });
+      if (oauth && client.clientId.trim()) await api(`/api/connections/${conn.id}`, { method: "PATCH", json: { oauthClient: client } });
+      await onAdded(conn.id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <section className="conn-add">
-      <div className="conn-add-bar">
-        <h3 className="conn-section">Añadir conexión</h3>
-        <span style={{ flex: 1 }} />
-        <FilterChips label="Tipo" options={FILTERS} value={filter} onChange={(k) => setFilter(k as CatalogFilter)} />
-        <SearchBox value={query} onChange={setQuery} placeholder="Buscar servicio…" />
-      </div>
-      <div className="conn-cats">
-        <FilterChips
-          label="Categoría"
-          options={[{ key: "todas", label: "Todas", count: base.length }, ...categoryCounts(base).map((c) => ({ key: c.key, label: c.label, icon: c.icon, count: c.count }))]}
-          value={category}
-          onChange={setCategory}
-        />
-      </div>
-      {groups.map((g) => (
-        <div key={g.key} className="conn-group">
-          {category === "todas" && (
-            <h4 className="conn-group-title">
-              <span aria-hidden>{g.icon}</span> {g.label} <span className="muted">{g.items.length}</span>
-            </h4>
-          )}
-          <div className="conn-catalog">{g.items.map(pick)}</div>
-        </div>
-      ))}
-      {items.length === 0 && <p className="muted small">Nada coincide.</p>}
-      {s && (
-        <form
-          className="conn-add-form"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            try {
-              await api("/api/connections", { method: "POST", json: { service, config } });
-              setConfig({});
-              setService("");
-              onAdded();
-            } catch (err) {
-              setError((err as Error).message);
-            }
-          }}
-        >
-          <p className="muted small conn-desc">{s.description}</p>
-          {Boolean(s.steps?.length) && (
-            <details className="conn-steps">
-              <summary>Cómo conectarla</summary>
-              <ol>
-                {s.steps!.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-            </details>
-          )}
-          <div className="conn-row">
-            {s.fields.map((f) => (
-              <input key={f.key} aria-label={f.label} value={config[f.key] ?? ""} placeholder={f.placeholder ?? f.label} onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })} />
+    <ConnModal
+      monogram={serviceMonogram(service.key, service.label)}
+      title={service.label}
+      subtitle={categoryLabel(serviceCategory(service.key, service.category))}
+      onClose={onClose}
+      foot={
+        <>
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button type="submit" form="conn-add-form" className="btn primary" disabled={busy}>
+            {busy ? "Conectando…" : "Conectar"}
+          </button>
+        </>
+      }
+    >
+      <p className="muted small conn-desc">{service.description}</p>
+      <Steps steps={service.steps} open />
+      <form
+        id="conn-add-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        {(service.fields.length > 0 || service.supportsSecret || oauth) && (
+          <div className="conn-modal-section">
+            <h3>Datos de la conexión</h3>
+            {service.fields.map((f) => (
+              <label key={f.key} className="conn-field">
+                <span>{f.label}</span>
+                <input value={config[f.key] ?? ""} placeholder={f.placeholder} onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })} />
+              </label>
             ))}
-            <button className="btn small primary">Añadir</button>
+            {service.supportsSecret && (
+              <label className="conn-field">
+                <span>
+                  {service.secretLabel ?? "Token"}
+                  {(service.secretOptional || service.key === "github") && <small className="muted"> (opcional)</small>}
+                </span>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={token}
+                  title={service.key === "github" ? `${GITHUB_TOKEN_HINT} Sin token, usa la sesión de GitHub CLI (gh).` : undefined}
+                  placeholder={service.secretPlaceholder ?? "Pega aquí la credencial"}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+              </label>
+            )}
+            {oauth && (
+              <>
+                <label className="conn-field">
+                  <span>Client ID o JSON</span>
+                  <input autoComplete="off" value={client.clientId} onChange={(e) => setClient({ ...client, clientId: e.target.value })} />
+                </label>
+                <label className="conn-field">
+                  <span>Client secret</span>
+                  <input type="password" autoComplete="off" value={client.clientSecret} onChange={(e) => setClient({ ...client, clientSecret: e.target.value })} />
+                </label>
+              </>
+            )}
           </div>
-          {error && <p className="bad-text small">{error}</p>}
-        </form>
+        )}
+        <p className="muted small">Se guarda cifrado. Después podrás probarla y decidir qué agentes la usan.</p>
+      </form>
+      {error && <p className="bad-text small">{error}</p>}
+    </ConnModal>
+  );
+}
+
+/** Ventana informativa de un servicio que vendrá: qué hará y cómo se conectará. */
+function UpcomingModal({ item, onClose }: { item: CatalogItem; onClose: () => void }) {
+  return (
+    <ConnModal
+      monogram={item.monogram}
+      title={item.label}
+      subtitle={`${categoryLabel(item.category)} · Próximamente`}
+      onClose={onClose}
+      foot={
+        <button type="button" className="btn" onClick={onClose}>
+          Cerrar
+        </button>
+      }
+    >
+      <p className="conn-desc">{item.description}</p>
+      {item.plan && (
+        <div className="conn-modal-section">
+          <h3>Cómo se conectará</h3>
+          <p className="muted small">{item.plan}</p>
+        </div>
       )}
-    </section>
+    </ConnModal>
   );
 }
