@@ -6,7 +6,7 @@ import type { Agent } from "@/lib/types";
 import type { Routine } from "@/lib/repo/routines";
 import { describeSchedule, ROUTINE_TEMPLATES, type Schedule } from "@/lib/routines/schedule";
 import { whenLabel } from "@/lib/ui/text";
-import { useMounted } from "./panels/common";
+import { useMounted } from "./ui/hooks";
 import { Card, Chip, EmptyState, SectionHeader } from "./ui/kit";
 
 const DAYS = ["L", "M", "X", "J", "V", "S", "D"];
