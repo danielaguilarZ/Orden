@@ -15,3 +15,4 @@ import "./discord";
 import "./slack";
 import "./ntfy";
 import "./pushover";
+import "./homeassistant";
