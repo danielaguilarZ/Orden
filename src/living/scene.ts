@@ -6,8 +6,10 @@
  * cliente, así que no hay problemas de hidratación.
  */
 
-import { Application, Container, Rectangle, Sprite, Texture, TextureSource } from "pixi.js";
+import { Application, Container, Graphics, Rectangle, Sprite, Texture, TextureSource, type FederatedPointerEvent } from "pixi.js";
 import type { Agent, AgentStatus, Room } from "../lib/types";
+import { highlightCells, roomBounds, type DecorGhost } from "./decorMode";
+import { doorTiles } from "./decorator";
 import { untilText, type ClaudeUsage } from "../lib/claude/usageText";
 import { getPersonality } from "../lib/personalities";
 import { AVATAR_W, FOOT_X, FOOT_Y, SEAT_Y, POSES, appearanceKey, drawAvatar, type Pose, type View } from "./avatar";
@@ -41,6 +43,26 @@ export interface SceneCallbacks {
   onUsageClick?: () => void;
 }
 
+/** Modo «decorar»: lo que la escena avisa a la interfaz. */
+export interface DecorHandlers {
+  /** Se pulsa un mueble de la sala que se decora (punto en coordenadas del mundo). */
+  onItemDown: (id: string, e: { clientX: number; clientY: number; wx: number; wy: number }) => void;
+  /** Clic en un hueco (sin arrastrar la cámara): soltar la selección. */
+  onEmptyTap: () => void;
+}
+
+/** Lo que la escena pinta en el modo «decorar». */
+export interface DecorView {
+  selectedId: string | null;
+  /** Mueble que se está arrastrando (se atenúa en su sitio). */
+  liftedId: string | null;
+  ghost: DecorGhost | null;
+}
+
+const GHOST_OK = 0x8dffa8;
+const GHOST_BAD = 0xff7a7a;
+const SELECTED_TINT = 0xffe7a8;
+
 const STATUS_LABEL: Record<AgentStatus, string> = {
   idle: "Disponible",
   working: "Trabajando",
@@ -72,13 +94,14 @@ function avatarTextures(agent: Agent): Record<string, Texture> {
   return set;
 }
 
-const furnitureCache = new Map<string, { tex: Texture; ox: number; oy: number }>();
+const furnitureCache = new Map<string, { tex: Texture; ox: number; oy: number; img: PixelImage }>();
 function furnitureTexture(kind: string, flip?: boolean, tint?: Record<string, string>) {
   const key = `${kind}|${flip ? 1 : 0}|${JSON.stringify(tint ?? {})}`;
   let entry = furnitureCache.get(key);
   if (!entry) {
     const img = rasterizeBoxes(resolveBoxes(kind, flip, tint));
-    entry = { tex: toTexture(img), ox: img.ox, oy: img.oy };
+    // Se guarda la imagen para saber qué píxeles son del mueble (pulsar en modo decorar).
+    entry = { tex: toTexture(img), ox: img.ox, oy: img.oy, img };
     furnitureCache.set(key, entry);
   }
   return entry;
@@ -95,6 +118,19 @@ interface Seat {
   bed: boolean;
   nearDesk: boolean;
   roomId: string;
+}
+
+/** Rombo de una baldosa de la casa en el suelo (para la rejilla del modo decorar). */
+function tileDiamond(tx: number, ty: number): number[] {
+  return [
+    [tx, ty],
+    [tx + 1, ty],
+    [tx + 1, ty + 1],
+    [tx, ty + 1],
+  ].flatMap(([x, y]) => {
+    const p = project(x * T, y * T, 0);
+    return [p.sx, p.sy];
+  });
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -199,6 +235,16 @@ export class LivingScene {
   private meterTextAt = 0;
   private destroyed = false;
   private resizeObs: ResizeObserver;
+  /** Rejilla y baldosas resaltadas del modo decorar (entre el suelo y los muebles). */
+  private decorLayer = new Container();
+  private decorGrid = new Graphics();
+  private decorMarks = new Graphics();
+  private decorGhost: Sprite | null = null;
+  private decor: { roomId: string; handlers: DecorHandlers } | null = null;
+  private decorView: DecorView = { selectedId: null, liftedId: null, ghost: null };
+  private decorToolbar: HTMLElement | null = null;
+  /** Sprites de los muebles por id, con su imagen (para pulsarlos con precisión de píxel). */
+  private furnSprites = new Map<string, { sprite: Sprite; img: PixelImage; roomId: string }>();
 
   private constructor(app: Application, host: HTMLDivElement, overlay: HTMLDivElement, callbacks: SceneCallbacks) {
     this.app = app;
@@ -212,11 +258,15 @@ export class LivingScene {
     this.roomLabel.className = "room-label";
     overlay.appendChild(this.roomLabel);
     this.objects.sortableChildren = true;
-    this.world.addChild(this.bgLayer, this.objects);
+    this.decorLayer.addChild(this.decorGrid, this.decorMarks);
+    this.decorLayer.visible = false;
+    this.world.addChild(this.bgLayer, this.decorLayer, this.objects);
     app.stage.addChild(this.world);
     this.setupCamera();
     app.ticker.add((t) => this.tick(t.deltaMS));
     this.resizeObs = new ResizeObserver(() => {
+      // El lienzo sigue al hueco (p. ej. al abrir o cerrar la ficha lateral), no solo a la ventana.
+      this.app.resize();
       if (!this.userMoved) this.fit();
     });
     this.resizeObs.observe(host);
@@ -245,9 +295,11 @@ export class LivingScene {
     const stage = this.app.stage;
     stage.eventMode = "static";
     stage.hitArea = this.app.screen;
-    let drag: { x: number; y: number; wx: number; wy: number } | null = null;
+    let drag: { x: number; y: number; wx: number; wy: number; moved: boolean } | null = null;
     stage.on("pointerdown", (e) => {
-      drag = { x: e.global.x, y: e.global.y, wx: this.world.x, wy: this.world.y };
+      // Decorando, pulsar un mueble de la sala lo coge; en un hueco se mueve la cámara.
+      if (this.decor && e.button === 0 && this.decorPointerDown(e)) return;
+      drag = { x: e.global.x, y: e.global.y, wx: this.world.x, wy: this.world.y, moved: false };
     });
     stage.on("pointermove", (e) => {
       if (!drag) {
@@ -256,12 +308,17 @@ export class LivingScene {
       }
       const dx = e.global.x - drag.x;
       const dy = e.global.y - drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) this.userMoved = true;
+      if (Math.abs(dx) + Math.abs(dy) > 3) {
+        this.userMoved = true;
+        drag.moved = true;
+      }
       this.world.position.set(Math.round(drag.wx + dx), Math.round(drag.wy + dy));
     });
-    const end = () => (drag = null);
-    stage.on("pointerup", end);
-    stage.on("pointerupoutside", end);
+    stage.on("pointerup", () => {
+      if (drag && !drag.moved) this.decor?.handlers.onEmptyTap();
+      drag = null;
+    });
+    stage.on("pointerupoutside", () => (drag = null));
     this.app.canvas.addEventListener(
       "wheel",
       (ev) => {
@@ -312,6 +369,9 @@ export class LivingScene {
     this.bgLayer.removeChildren().forEach((c) => c.destroy());
     for (const m of this.meters) m.el.remove();
     this.meters = [];
+    this.furnSprites.clear();
+    // La sombra del modo decorar también se rehace (se destruye con el resto).
+    this.decorGhost = null;
     for (const child of [...this.objects.children]) {
       if (!(child as Sprite & { __actor?: boolean }).__actor) {
         this.objects.removeChild(child);
@@ -369,7 +429,7 @@ export class LivingScene {
         if (def.wall) depth = -2000 + depth;
         else if (def.walkable) depth = -1000 + depth;
         else for (let dy = 0; dy < fp.d; dy++) for (let dx = 0; dx < fp.w; dx++) tileDepth.set(`${gx + dx},${gy + dy}`, depth);
-        this.addFurnitureSprite(f, gx, gy, depth);
+        this.addFurnitureSprite(f, gx, gy, depth, room.id);
         if (def.seat) {
           const face = f.flip ? (def.seat.face === "x" ? "y" : "x") : def.seat.face === "y" ? "y" : "x";
           const nearDesk = isNearDesk(f, room.furniture);
@@ -381,21 +441,24 @@ export class LivingScene {
       const gx = room.x + f.x;
       const gy = room.y + f.y;
       const base = tileDepth.get(`${gx},${gy}`) ?? gx + gy + 1;
-      this.addFurnitureSprite(f, gx, gy, base + 0.01);
+      this.addFurnitureSprite(f, gx, gy, base + 0.01, room.id);
     }
     const all = rooms.flatMap((r) => r.furniture.map((f) => f.id));
     this.knownFurniture = new Set(all);
     this.dropIndex = 0;
+    if (this.decor) this.drawDecorGrid();
+    this.renderDecor();
     if (!this.userMoved) this.fit();
   }
 
-  private addFurnitureSprite(f: Room["furniture"][number], gx: number, gy: number, depth: number) {
-    const { tex, ox, oy } = furnitureTexture(f.kind, f.flip, f.tint);
+  private addFurnitureSprite(f: Room["furniture"][number], gx: number, gy: number, depth: number, roomId: string) {
+    const { tex, ox, oy, img } = furnitureTexture(f.kind, f.flip, f.tint);
     const p = project(gx * T, gy * T, f.z ?? 0);
     const s = new Sprite(tex);
     s.position.set(p.sx + ox, p.sy + oy);
     s.zIndex = depth;
     this.objects.addChild(s);
+    this.furnSprites.set(f.id, { sprite: s, img, roomId });
     if (f.kind === "medidor_claude" || f.kind === "holo_boton") this.addMeter(gx, gy, f, s);
     // Mueble nuevo (sala recién creada o redecorada): aparece cayendo, uno tras otro.
     if (this.knownFurniture && !this.knownFurniture.has(f.id)) {
@@ -469,6 +532,171 @@ export class LivingScene {
         m.el.appendChild(row);
       }
     }
+  }
+
+  // ───────────────────────── Modo decorar ─────────────────────────
+
+  /** Entra en el modo decorar de una sala (o sale con null). */
+  setDecorMode(roomId: string | null, handlers?: DecorHandlers) {
+    this.decor = roomId && handlers ? { roomId, handlers } : null;
+    if (!this.decor) this.decorView = { selectedId: null, liftedId: null, ghost: null };
+    this.drawDecorGrid();
+    this.renderDecor();
+  }
+
+  /** Selección, mueble levantado y sombra (verde si cabe, roja si no). */
+  setDecorView(view: DecorView) {
+    this.decorView = view;
+    this.renderDecor();
+  }
+
+  /** Barra flotante (girar, duplicar, quitar) que se coloca encima del mueble elegido. */
+  setDecorToolbar(el: HTMLElement | null) {
+    this.decorToolbar = el;
+  }
+
+  /** Punto del mundo bajo unas coordenadas de la ventana (null si cae fuera del lienzo). */
+  clientToWorld(clientX: number, clientY: number): { wx: number; wy: number } | null {
+    const rect = this.app.canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
+    const p = this.world.toLocal({ x, y });
+    return { wx: p.x, wy: p.y };
+  }
+
+  /** Encuadra una sala con el zoom entero más grande que quepa, dejando sitio a los paneles (px). */
+  focusRoom(roomId: string, pad: { top?: number; right?: number; bottom?: number; left?: number } = {}) {
+    const room = this.rooms.find((r) => r.id === roomId);
+    if (!room) return;
+    this.app.resize();
+    const { top = 0, right = 0, bottom = 0, left = 0 } = pad;
+    const w = this.app.screen.width - left - right;
+    const h = this.app.screen.height - top - bottom;
+    if (w < 80 || h < 80) return;
+    const b = roomBounds(room);
+    const z = Math.max(1, Math.min(5, Math.floor(Math.min((w - 24) / b.width, (h - 24) / b.height))));
+    this.zoom = z;
+    this.world.scale.set(z);
+    this.world.position.set(Math.round(left + w / 2 - (b.x + b.width / 2) * z), Math.round(top + h / 2 - (b.y + b.height / 2) * z));
+    this.userMoved = true;
+  }
+
+  /** Pulsación en modo decorar: si cae sobre un mueble de la sala, se avisa y no se mueve la cámara. */
+  private decorPointerDown(e: FederatedPointerEvent): boolean {
+    const id = this.pickFurniture(e.global.x, e.global.y);
+    if (!id || !this.decor) return false;
+    const p = this.world.toLocal(e.global);
+    this.decor.handlers.onItemDown(id, { clientX: e.clientX, clientY: e.clientY, wx: p.x, wy: p.y });
+    return true;
+  }
+
+  /** Mueble de la sala que se decora bajo un punto de la pantalla, mirando sus píxeles (el de delante gana). */
+  private pickFurniture(gx: number, gy: number): string | null {
+    if (!this.decor) return null;
+    const p = this.world.toLocal({ x: gx, y: gy });
+    let best: { id: string; z: number } | null = null;
+    for (const [id, f] of this.furnSprites) {
+      if (f.roomId !== this.decor.roomId || f.sprite.destroyed) continue;
+      const lx = Math.floor(p.x - f.sprite.x);
+      const ly = Math.floor(p.y - f.sprite.y);
+      if (lx < 0 || ly < 0 || lx >= f.img.width || ly >= f.img.height) continue;
+      if (f.img.data[(ly * f.img.width + lx) * 4 + 3] < 40) continue;
+      if (!best || f.sprite.zIndex > best.z) best = { id, z: f.sprite.zIndex };
+    }
+    return best?.id ?? null;
+  }
+
+  private decorRoom(): Room | undefined {
+    return this.decor ? this.rooms.find((r) => r.id === this.decor!.roomId) : undefined;
+  }
+
+  /** Rejilla de baldosas de la sala y pasos de puerta (que hay que dejar libres). */
+  private drawDecorGrid() {
+    const g = this.decorGrid;
+    g.clear();
+    const room = this.decorRoom();
+    this.decorLayer.visible = Boolean(room);
+    if (!room) return;
+    for (const [x, y] of doorTiles(room.w, room.d)) g.poly(tileDiamond(room.x + x, room.y + y)).fill({ color: 0xe8b04a, alpha: 0.28 });
+    for (let i = 0; i <= room.w; i++) {
+      const a = project((room.x + i) * T, room.y * T, 0);
+      const b = project((room.x + i) * T, (room.y + room.d) * T, 0);
+      g.moveTo(a.sx, a.sy).lineTo(b.sx, b.sy);
+    }
+    for (let j = 0; j <= room.d; j++) {
+      const a = project(room.x * T, (room.y + j) * T, 0);
+      const b = project((room.x + room.w) * T, (room.y + j) * T, 0);
+      g.moveTo(a.sx, a.sy).lineTo(b.sx, b.sy);
+    }
+    g.stroke({ width: 1, color: 0xffffff, alpha: 0.32, pixelLine: true });
+  }
+
+  /** Pinta la selección, el mueble levantado y la sombra; y quita la interacción de agentes y medidores. */
+  private renderDecor() {
+    const room = this.decorRoom();
+    const v = this.decorView;
+    for (const [id, f] of this.furnSprites) {
+      if (f.sprite.destroyed) continue;
+      const mine = Boolean(room) && f.roomId === room!.id;
+      f.sprite.tint = mine && id === v.selectedId ? SELECTED_TINT : 0xffffff;
+      if (mine && id === v.liftedId) f.sprite.alpha = 0.3;
+      else if (f.sprite.alpha === 0.3) f.sprite.alpha = 1;
+    }
+
+    const m = this.decorMarks;
+    m.clear();
+    if (this.decorGhost) {
+      this.objects.removeChild(this.decorGhost);
+      this.decorGhost.destroy();
+      this.decorGhost = null;
+    }
+    if (room) {
+      const inside = ([x, y]: [number, number]) => x >= 0 && y >= 0 && x < room.w && y < room.d;
+      const sel = v.selectedId && !v.liftedId ? room.furniture.find((f) => f.id === v.selectedId) : undefined;
+      if (sel) for (const c of highlightCells(sel).filter(inside)) m.poly(tileDiamond(room.x + c[0], room.y + c[1])).fill({ color: 0xe8b04a, alpha: 0.4 });
+      const ghost = v.ghost && FURNITURE[v.ghost.kind] ? v.ghost : null;
+      if (ghost) {
+        const color = ghost.ok ? GHOST_OK : GHOST_BAD;
+        for (const c of highlightCells(ghost).filter(inside)) m.poly(tileDiamond(room.x + c[0], room.y + c[1])).fill({ color, alpha: 0.45 });
+        const { tex, ox, oy } = furnitureTexture(ghost.kind, ghost.flip, ghost.tint);
+        const p = project((room.x + ghost.x) * T, (room.y + ghost.y) * T, ghost.z ?? 0);
+        const s = new Sprite(tex);
+        s.position.set(p.sx + ox, p.sy + oy);
+        s.zIndex = 1e6;
+        s.alpha = 0.82;
+        s.tint = color;
+        s.eventMode = "none";
+        this.objects.addChild(s);
+        this.decorGhost = s;
+      }
+    }
+    this.applyDecorInteractivity();
+  }
+
+  /** Decorando, los agentes y los medidores se apartan (semitransparentes y sin clic). */
+  private applyDecorInteractivity() {
+    const on = Boolean(this.decor);
+    for (const meter of this.meters) if (!meter.sprite.destroyed) meter.sprite.eventMode = on ? "none" : "static";
+    for (const a of this.actors.values()) {
+      a.sprite.eventMode = on ? "none" : "static";
+      a.sprite.alpha = on ? 0.45 : 1;
+    }
+    if (on) this.setHover(null);
+  }
+
+  private placeDecorToolbar() {
+    const el = this.decorToolbar;
+    if (!el) return;
+    const id = this.decor && !this.decorView.liftedId ? this.decorView.selectedId : null;
+    const f = id ? this.furnSprites.get(id) : undefined;
+    if (!f || f.sprite.destroyed) {
+      el.style.visibility = "hidden";
+      return;
+    }
+    const top = this.world.toGlobal({ x: f.sprite.x + f.img.width / 2, y: f.sprite.y });
+    el.style.transform = `translate(${Math.round(top.x)}px, ${Math.round(top.y) - 6}px) translate(-50%, -100%)`;
+    el.style.visibility = "visible";
   }
 
   private animateDrops(now: number) {
@@ -545,6 +773,7 @@ export class LivingScene {
       if (agent.statusText && agent.statusText !== actor.lastStatusText) actor.say(agent.statusText, 7000);
       actor.lastStatusText = agent.statusText;
     }
+    if (this.decor) this.applyDecorInteractivity();
   }
 
   /** Muestra un bocadillo en un agente (por ejemplo, al recibir un mensaje). */
@@ -673,6 +902,7 @@ export class LivingScene {
     const now = performance.now();
     const dt = Math.min(dtMs, 100) / 1000;
     this.animateDrops(now);
+    this.placeDecorToolbar();
     for (const m of this.meters) {
       const p = project((m.gx + 0.5) * T, (m.gy + 0.5) * T, m.z);
       const g = this.world.toGlobal({ x: p.sx, y: p.sy });

@@ -21,7 +21,7 @@ export interface ClientState {
   /** Orden se está reiniciando para cargar cambios de código. */
   restarting: string | null;
   lastEventId: number;
-  /** Editor de sala abierto: sala y borrador de muebles y de suelo/paredes (se ven en el living antes de guardar). */
+  /** Modo «decorar» activo: sala y borrador de muebles y de suelo/paredes (se ven en el living antes de guardar). */
   roomEdit: { roomId: string; furniture: FurnitureItem[] | null; style?: RoomStyle | null; rename?: boolean } | null;
 }
 
@@ -81,8 +81,8 @@ export function hydrate(init: {
   });
 }
 
-/** Abre el editor de una sala (o lo cierra con null). `rename`: empieza editando el nombre. */
-export function openRoomEditor(roomId: string | null, opts: { rename?: boolean } = {}) {
+/** Entra en el modo «decorar» de una sala (o sale con null). `rename`: empieza editando el nombre. */
+export function openDecor(roomId: string | null, opts: { rename?: boolean } = {}) {
   set({ roomEdit: roomId ? { roomId, furniture: null, ...(opts.rename && { rename: true }) } : null });
 }
 
@@ -96,7 +96,7 @@ export function dropRoom(id: string) {
   set({ rooms: state.rooms.filter((r) => r.id !== id) });
 }
 
-/** Borrador del editor de sala: el living lo pinta en lugar de los muebles guardados. */
+/** Borrador del modo decorar: el living lo pinta en lugar de los muebles guardados. */
 export function setRoomDraft(furniture: FurnitureItem[] | null) {
   if (state.roomEdit) set({ roomEdit: { ...state.roomEdit, furniture } });
 }
