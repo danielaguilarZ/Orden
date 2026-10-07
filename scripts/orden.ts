@@ -116,8 +116,23 @@ let restarting = false;
 
 function killTree(child: ChildProcess | null) {
   if (!child?.pid || child.exitCode !== null) return;
-  if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
-  else child.kill("SIGTERM");
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+    return;
+  }
+  // Al grupo entero (node --watch, el worker y lo que lancen). Si node --watch
+  // recibe la señal mientras relanza el worker por cambios de archivos (justo lo
+  // que pasa al aplicar una propuesta), se queda colgado y vivo: se remata.
+  const pid = child.pid;
+  const signalGroup = (signal: NodeJS.Signals) => {
+    try {
+      process.kill(-pid, signal);
+    } catch {
+      // el grupo ya no existe
+    }
+  };
+  signalGroup("SIGTERM");
+  setTimeout(() => signalGroup("SIGKILL"), 5000).unref();
 }
 
 function stopService(s: Service) {
@@ -133,6 +148,8 @@ function launch(s: Service, args: string[], env: Record<string, string> = {}) {
     env: { ...process.env, ORDEN_MODE: mode, FORCE_COLOR: "1", ...env },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
+    // Fuera de Windows, grupo de procesos propio para poder pararlo entero (killTree).
+    detached: process.platform !== "win32",
   });
   s.child = child;
   child.stdout!.on("data", (d) => out(s.name, String(d)));
