@@ -44,7 +44,8 @@ También: `servicio:estado`, `servicio:parar`, `servicio:arrancar` y `servicio:q
 
 | Página | Para qué |
 | --- | --- |
-| **Living** | La casa. Escribe «Encárgale algo a Zen…», añade agentes y pulsa en cada uno para chatear, ver sus rutinas o editarlo. |
+| **Living** | La casa. Escribe «Encárgale algo a Zen…», añade agentes y pulsa en cada uno para chatear, ver su puesto y su cartera, sus rutinas o editarlo. |
+| **Organización** | Unidades (dirección, departamentos, empresas, lo personal), quién trabaja en cada una y en qué está. |
 | **Paneles** | Tus listas, tableros, calendarios, tablas, notas, hábitos y gráficos. Créalos con una plantilla (un clic) o pídeselos a un agente; se editan a mano y cada uno tiene «Pedir cambios» y un menú «⋯» (exportar `.md`/`.csv`/`.xlsx`/`.ics`, historial, tamaño, papelera). Pestaña **Archivos** para tus documentos. |
 | **Memoria** | Tu perfil de vida (quién eres, objetivos, preferencias, personas…). La consultan y amplían todos los agentes. |
 | **Actividad** | Registro de encargos, rutinas, cambios y errores. |
@@ -54,7 +55,7 @@ También: `servicio:estado`, `servicio:parar`, `servicio:arrancar` y `servicio:q
 
 | Servicio | Qué permite | Credencial |
 | --- | --- | --- |
-| GitHub | Leer y comentar; con permiso completo, ramas, commits y PRs (nunca fusiona). | `gh` del PC o token fine-grained cifrado |
+| GitHub | Leer y comentar; con permiso completo, ramas, commits y PRs (nunca fusiona). Un repo, todos los de un usuario u organización (`propietario/*`) o todos los tuyos (`*`, botón «Todos mis repos»). | `gh` del PC o token fine-grained cifrado |
 | Google Calendar | Leer la agenda y volcarla a un panel. Solo lectura. | OAuth en el navegador (calendar.readonly) |
 | Tiempo (clima) | Tiempo actual y previsión hasta 7 días (Open-Meteo). Solo lectura. | Ninguna |
 | Noticias (RSS) | Titulares de las fuentes RSS/Atom que elijas (máx. 15). Solo lectura. | Ninguna |
@@ -78,7 +79,7 @@ Cada agente nuevo recibe un escritorio en una «Oficina compartida» que se abre
 
 ### Torre de oficinas (plantas)
 
-La casa es una **torre de plantas apiladas** (planta baja · Vestíbulo, 1 · Trading, 2 · Marketing…). Cada sala
+La casa es una **torre de plantas apiladas** (planta baja · Vestíbulo, 1 · Oficina, 2 · Marketing…). Cada sala
 tiene su planta (`rooms.level`); cada zona de `BUILDINGS` (`roomTemplates.ts`) dice en qué planta se construyen
 sus salas, y `FLOOR_NAMES` da los nombres.
 
@@ -92,6 +93,32 @@ sus salas, y `FLOOR_NAMES` da los nombres.
 - **Ascensores:** un núcleo une todas las plantas (un mueble «ascensor» por planta; se pone solo al crear salas en
   otra planta). Los agentes entran por uno, desaparecen un momento y salen en la otra planta.
 - Un agente puede tener **despacho propio** (`sala_asignar`, solo el jefe).
+
+### Organización y piloto automático
+
+Orden puede funcionar como una empresa: **unidades** (dirección, departamentos que dan servicio a todo el grupo,
+una por empresa y lo personal) y, para cada agente, un **puesto** (unidad, cargo, funciones y si dirige su unidad)
+y una **cartera** de trabajo propio. Se configura en la página «Organización» y en la pestaña «Puesto» de cada
+agente; el jefe también puede hacerlo con sus herramientas.
+
+- **Piloto automático** (indicador arriba a la derecha; viene apagado): cuando nadie les pide nada, los agentes con
+  puesto trabajan su cartera y, si está vacía, planifican su siguiente tarea. Si no hay nada útil, lo dicen y esperan
+  unas horas en vez de inventar trabajo. Tus encargos van siempre primero y siempre queda un hueco libre.
+- **Regulador de uso:** lee los límites del plan de Claude (los mismos que muestra el medidor) y no pasa del tope
+  semanal (por defecto 70 %, repartido por días) ni del de cada sesión de 5 h (80 %). Sin medidor fiable (p. ej. con
+  API key) no trabaja: nunca gasta a ciegas.
+- **Modelo por tarea:** cada tarea puede pedir Haiku, Sonnet u Opus; si Opus llega a su tope semanal, baja a Sonnet.
+- Las plantas toman el nombre de sus unidades; hay plantillas de sala para montar plantas completas (recepción,
+  oficina abierta, despacho, sala de reuniones, office, biblioteca, sala de pantallas, sala de juntas…).
+
+Lógica en `src/lib/org/` (`budget.ts` el regulador, `autopilot.ts` el piloto); tests en `tests/org.test.ts`.
+
+### Adjuntos
+
+Arrastra archivos, pega una captura (⌘V / Ctrl+V) o usa el clip en el chat de cualquier agente, en la respuesta
+a una decisión o en el cuadro de encargos del living. Se guardan en la carpeta compartida **«Adjuntos/<fecha>»**
+de Archivos, así que cualquier agente puede leerlos después. Las imágenes y los PDF van dentro del propio mensaje
+(el agente los ve sin buscarlos) y `archivo_leer` devuelve las imágenes como imagen. Hasta 10 por mensaje.
 
 ### Modo decorar
 

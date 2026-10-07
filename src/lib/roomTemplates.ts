@@ -29,17 +29,17 @@ export interface RoomTemplate {
  */
 export const BUILDINGS: Record<string, { label: string; fallback: string; level: number }> = {
   // Cada «edificio» es ahora una zona con planta propia de la torre (`level`).
-  orden: { label: "Trading", fallback: "estudio", level: 1 },
+  orden: { label: "Oficina", fallback: "estudio", level: 1 },
   marketing: { label: "Marketing", fallback: "marketing_abierta", level: 2 },
 };
 
 /**
- * Nombres de las plantas de la torre (estilo Pearson Hardman), de abajo
+ * Nombres de las plantas de la torre (una torre de oficinas), de abajo
  * arriba. Las que aún no tienen salas se ven como plantas diáfanas.
  */
 export const FLOOR_NAMES: Record<number, string> = {
   0: "Vestíbulo",
-  1: "Trading",
+  1: "Oficina",
   2: "Marketing",
 };
 

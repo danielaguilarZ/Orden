@@ -111,7 +111,7 @@ describe("salas por ámbito", () => {
     const room = listRooms().find((r) => r.id === leo.roomId)!;
     expect(room).toMatchObject({ kind: "oficina", name: "Oficina compartida", agentId: null });
     expect(room.furniture.length).toBeGreaterThan(5);
-    // En la planta de trading (su franja del plano empieza en levelOrigin(1)).
+    // En la planta principal (su franja del plano empieza en levelOrigin(1)).
     const o = levelOrigin(1);
     expect(room.level).toBe(1);
     expect([room.x, room.y]).toEqual([o.x + 10, 0]);

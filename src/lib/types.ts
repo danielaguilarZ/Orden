@@ -84,7 +84,7 @@ export interface Room {
   /** Tema de la sala: despacho, finanzas, biblioteca, cocina… */
   kind: string;
   agentId: string | null;
-  /** Zona (planta temática) a la que pertenece: «orden» (trading, por defecto) u otra de `BUILDINGS`. */
+  /** Zona (planta temática) a la que pertenece: «orden» (la oficina principal, por defecto) u otra de `BUILDINGS`. */
   building?: string;
   /**
    * Planta de la torre (0 = planta baja). Cada planta ocupa su propia franja

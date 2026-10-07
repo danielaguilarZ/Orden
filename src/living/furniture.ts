@@ -662,7 +662,7 @@ Object.assign(FURNITURE, {
 
 // ───────────── Muebles modernos ─────────────
 // Líneas finas, blanco y negro mate, roble claro y pantallas: para oficinas
-// y salas con aire contemporáneo (sala de trading, estudio, salón actual).
+// y salas con aire contemporáneo (sala de mercados, estudio, salón actual).
 
 const NEGRO = "#1f2226";
 const MALLA = "#2b2f36";

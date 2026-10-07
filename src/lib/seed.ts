@@ -38,7 +38,7 @@ export function ensureSeed() {
     });
     if (listRooms().length === 0) {
       const zenTpl = ROOM_TEMPLATES.despacho_zen;
-      // En la planta de su zona (la de trading), en la esquina de esa planta.
+      // En la planta de su zona (la oficina principal), en la esquina de esa planta.
       const level = buildingLevel(DEFAULT_BUILDING);
       const origin = levelOrigin(level);
       createRoom({

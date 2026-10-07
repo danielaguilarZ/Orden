@@ -133,7 +133,7 @@ function UnitForm({ draft, onClose }: { draft: Partial<Unit>; onClose: () => voi
       <div className="row">
         <label>
           Nombre
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Terral Studio" required minLength={2} maxLength={60} autoFocus />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Mi empresa" required minLength={2} maxLength={60} autoFocus />
         </label>
         <label>
           Tipo

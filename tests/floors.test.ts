@@ -102,7 +102,7 @@ describe("dibujo apilado (puro)", () => {
 });
 
 describe("migración a plantas", () => {
-  it("pasa trading a la planta 1 y marketing a la 2 sin perder muebles, puertas ni escritorios", () => {
+  it("pasa la oficina principal a la planta 1 y marketing a la 2 sin perder muebles, puertas ni escritorios", () => {
     const db = new DatabaseSync(":memory:");
     for (const m of migrations.filter((m) => m.version <= 16)) m.up(db);
     db.exec("PRAGMA user_version = 16");
@@ -114,7 +114,7 @@ describe("migración a plantas", () => {
     let t = 0;
     const add = (id: string, building: string, x: number, y: number, archived: string | null = null) =>
       insert.run(id, id, "estudio", building, x, y, furn(`f-${id}`), archived, `2026-01-01T00:00:0${t}Z`, `2026-01-01T00:00:0${t++}Z`);
-    // Como estaba: trading en el suelo y marketing «arriba» en diagonal (migración 16).
+    // Como estaba: la oficina principal en el suelo y marketing «arriba» en diagonal (migración 16).
     add("zen", "orden", 0, 0);
     add("oficina", "orden", 10, 0);
     add("recepcion", "marketing", -28, -28);

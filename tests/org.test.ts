@@ -59,7 +59,7 @@ describe("piloto automático", () => {
   });
 
   const staff = () => {
-    const unit = createUnit({ name: "Terral Studio", kind: "empresa", summary: "Agencia web" });
+    const unit = createUnit({ name: "Estudio web", kind: "empresa", summary: "Agencia web" });
     const ana = hireAgent({ name: "Ana", specialty: "SEO", model: "sonnet" });
     setRole(ana.id, { unitId: unit.id, role: "Especialista SEO", duties: "Auditorías SEO de clientes" });
     return { unit, ana };

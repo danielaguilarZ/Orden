@@ -31,7 +31,7 @@ export interface Unit {
 export interface AgentRole {
   agentId: string;
   unitId: string | null;
-  /** Cargo: «Abogada mercantil», «Responsable de Terral Studio»… */
+  /** Cargo: «Abogada mercantil», «Responsable de producto»… */
   role: string;
   /** Funciones del puesto: de qué se ocupa sin que nadie se lo pida. */
   duties: string;

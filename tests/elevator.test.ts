@@ -85,7 +85,7 @@ describe("plantas en la base de datos", () => {
     ensureSeed();
   });
 
-  it("el despacho inicial está en la planta de trading, en la esquina de su franja", () => {
+  it("el despacho inicial está en la planta principal, en la esquina de su franja", () => {
     const [zen] = listRooms();
     expect(levelOf(zen)).toBe(BUILDINGS.orden.level);
     expect([zen.x, zen.y]).toEqual([levelOrigin(BUILDINGS.orden.level).x, 0]);
@@ -98,15 +98,15 @@ describe("plantas en la base de datos", () => {
     expect(levelOf(lobby)).toBe(2);
     expect([lobby.x, lobby.y]).toEqual([levelOrigin(2).x, 0]);
     expect(Math.abs(office.x - lobby.x) + Math.abs(office.y - lobby.y)).toBe(10);
-    // La planta de trading recibe su ascensor sola y no hay pasarela.
-    const trading = listRooms().filter((r) => levelOf(r) === 1);
-    expect(trading.flatMap((r) => r.furniture).filter((f) => f.kind === "ascensor")).toHaveLength(1);
+    // La planta principal recibe su ascensor sola y no hay pasarela.
+    const principal = listRooms().filter((r) => levelOf(r) === 1);
+    expect(principal.flatMap((r) => r.furniture).filter((f) => f.kind === "ascensor")).toHaveLength(1);
     expect(computeWalkways(listRooms())).toEqual([]);
     expect(computeElevators(listRooms())).toHaveLength(1);
     const g = buildNavGrid(listRooms());
-    const zen = trading[0];
+    const zen = principal[0];
     expect(findPath(g, { x: zen.x + 5, y: zen.y + 8 }, { x: office.x + 5, y: office.y + 8 })?.some((p) => p.elevator)).toBe(true);
-    expect(describeRooms(listRooms(), listAgents(), listAgents()[0])).toMatch(/Planta 2 · Marketing[\s\S]*Planta 1 · Trading/);
+    expect(describeRooms(listRooms(), listAgents(), listAgents()[0])).toMatch(/Planta 2 · Marketing[\s\S]*Planta 1 · Oficina/);
   });
 
   it("sus plantillas son de su zona y la recepción trae el ascensor con la entrada libre", () => {
