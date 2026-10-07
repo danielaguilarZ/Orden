@@ -321,6 +321,26 @@ export class RepoApi {
   createPull(body: { title: string; head: string; base: string; body?: string; draft?: boolean }) {
     return this.call<PullItem>("POST", "/pulls", body);
   }
+  /** Fusiona un PR. GitHub aplica sus protecciones de rama (revisiones, checks obligatorios…). */
+  mergePull(n: number, body: { merge_method: "merge" | "squash" | "rebase"; commit_title?: string; sha?: string }) {
+    return this.call<{ merged: boolean; sha: string; message: string }>("PUT", `/pulls/${n}/merge`, body);
+  }
+  closePull(n: number) {
+    return this.call<PullItem>("PATCH", `/pulls/${n}`, { state: "closed" });
+  }
+  review(n: number, body: { event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT"; body: string }) {
+    return this.call<{ id: number; html_url: string; state: string }>("POST", `/pulls/${n}/reviews`, body);
+  }
+  deleteBranch(branch: string) {
+    return this.call<unknown>("DELETE", `/git/refs/heads/${encPath(branch)}`);
+  }
+  /** Checks (GitHub Actions y otros) de un commit. */
+  checkRuns(sha: string) {
+    return this.call<{ total_count: number; check_runs: { name: string; status: string; conclusion: string | null }[] }>(
+      "GET",
+      `/commits/${encodeURIComponent(sha)}/check-runs${query({ per_page: 100 })}`,
+    );
+  }
   /** Búsqueda de código SOLO en este repo (se quitan calificadores que amplíen el alcance). */
   searchCode(text: string) {
     const clean = text.replace(/\b(repo|org|user|owner):\S+/gi, " ").replace(/\s+/g, " ").trim();
@@ -393,14 +413,29 @@ export interface PullItem {
   user: User | null;
   draft?: boolean;
   merged?: boolean;
-  head: { ref: string };
-  base: { ref: string };
+  head: { ref: string; sha?: string; repo?: { full_name: string } | null };
+  base: { ref: string; repo?: { full_name: string } | null };
   created_at: string;
   updated_at: string;
   additions?: number;
   deletions?: number;
   changed_files?: number;
   mergeable?: boolean | null;
+  mergeable_state?: string;
+}
+
+/** Usuario de la cuenta conectada. */
+export function currentUser(transport: Transport) {
+  return transport({ method: "GET", path: "/user" }) as Promise<{ login: string }>;
+}
+
+/** Crea un repo en la cuenta (o en una organización). Privado y con README inicial por defecto. */
+export function createRepo(transport: Transport, input: { owner?: string; name: string; description?: string; private: boolean }, login: string) {
+  const name = String(input.name ?? "").trim();
+  if (!/^[A-Za-z0-9._-]{1,100}$/.test(name) || name === "." || name === "..") throw new Error("Nombre de repo no válido: letras, números, «-», «_» o «.».");
+  const body = { name, description: input.description?.slice(0, 350), private: input.private, auto_init: true };
+  const inOrg = input.owner && input.owner.toLowerCase() !== login.toLowerCase();
+  return transport({ method: "POST", path: inOrg ? `/orgs/${encodeURIComponent(input.owner!)}/repos` : "/user/repos", body }) as Promise<RepoInfo>;
 }
 export interface CommentItem {
   id: number;

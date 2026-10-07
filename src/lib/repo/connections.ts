@@ -8,9 +8,18 @@ import { decryptSecret, encryptSecret, secretHint } from "../secrets";
  * La credencial va cifrada y nunca sale de aquí hacia la interfaz.
  */
 
-/** «lectura»: leer y comentar. «completo»: además crear y modificar. */
-export type GrantLevel = "lectura" | "completo";
-export const GRANT_LEVELS: GrantLevel[] = ["lectura", "completo"];
+/**
+ * «lectura»: leer y comentar. «completo»: además crear y modificar.
+ * «admin»: además lo de más alcance (en GitHub: fusionar PRs, crear repos,
+ * borrar ramas). Solo existe en los servicios que lo declaran.
+ */
+export type GrantLevel = "lectura" | "completo" | "admin";
+export const GRANT_LEVELS: GrantLevel[] = ["lectura", "completo", "admin"];
+
+/** ¿Este nivel incluye a `min`? (admin ⊇ completo ⊇ lectura) */
+export function levelAtLeast(level: GrantLevel, min: GrantLevel): boolean {
+  return GRANT_LEVELS.indexOf(level) >= GRANT_LEVELS.indexOf(min);
+}
 
 /** Cómo se autentica: «auto» = gh si está disponible, si no el token guardado. */
 export type AuthMode = "auto" | "gh" | "token";

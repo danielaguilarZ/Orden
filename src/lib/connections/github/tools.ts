@@ -3,7 +3,8 @@ import { defineTool, fail, ok, type ToolContext, type ToolDef } from "../../agen
 import { logActivity } from "../../repo/system";
 import { redact } from "../../secrets";
 import type { AgentGrant } from "../registry";
-import { parseRepo, RepoApi, resolveTransport, safeBranch, safePath, safeSha, type ContentItem, type IssueItem } from "./api";
+import { createRepo, currentUser, parseRepo, RepoApi, resolveTransport, safeBranch, safePath, safeSha, type ContentItem, type IssueItem } from "./api";
+import { levelAtLeast, type GrantLevel } from "../../repo/connections";
 import { inScope, isWildcard, listScopeRepos, scopeLabel } from "./scope";
 import { fetchSnapshot, statusMarkdown } from "./status";
 
@@ -34,7 +35,8 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
   if (!grants.length) return [];
   const scopeOf = (g: AgentGrant) => String(g.connection.config.repo);
   const repos = grants.map(scopeOf);
-  const fullRepos = grants.filter((g) => g.level === "completo").map(scopeOf);
+  const fullRepos = grants.filter((g) => levelAtLeast(g.level, "completo")).map(scopeOf);
+  const adminRepos = grants.filter((g) => g.level === "admin").map(scopeOf);
   const wildcard = repos.some(isWildcard);
   const multi = repos.length > 1 || wildcard;
 
@@ -46,9 +48,12 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
   };
 
   /** Conexión y repo para una llamada: el repo concreto pedido, o el único que tiene. */
-  const pick = (repo: unknown, needFull: boolean): { g: AgentGrant; full: string } => {
-    const list = needFull ? grants.filter((g) => g.level === "completo") : grants;
-    const denied = needFull ? "No tienes permiso de escritura en ese repo." : "No tienes acceso a ese repo.";
+  /** need: false = leer, true = escribir (completo), "admin" = fusionar, borrar ramas… */
+  const pick = (repo: unknown, need: boolean | "admin"): { g: AgentGrant; full: string } => {
+    const min: GrantLevel = need === "admin" ? "admin" : need ? "completo" : "lectura";
+    const list = grants.filter((g) => levelAtLeast(g.level, min));
+    const denied =
+      need === "admin" ? "Eso necesita permiso «admin» en ese repo." : need ? "No tienes permiso de escritura en ese repo." : "No tienes acceso a ese repo.";
     if (!repo) {
       const g = list[0];
       if (!g) throw new Error(denied);
@@ -64,7 +69,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
 
   /** Envuelve cada herramienta: elige conexión, abre el cliente y limpia errores. */
   const run =
-    <A,>(needFull: boolean, fn: (api: RepoApi, args: A, g: AgentGrant) => Promise<string>) =>
+    <A,>(needFull: boolean | "admin", fn: (api: RepoApi, args: A, g: AgentGrant) => Promise<string>) =>
     async (args: A) => {
       try {
         const { g, full } = pick((args as { repo?: string }).repo, needFull);
@@ -252,10 +257,11 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
               const { transport } = await resolveTransport(g.connection);
               for (const r of await listScopeRepos(transport, scopeOf(g))) {
                 const level = pick(r.full_name, false).g.level;
-                const canWrite = grants.some((x) => x.level === "completo" && inScope(scopeOf(x), r.full_name)) && r.permissions?.push !== false;
+                const best = grants.filter((x) => inScope(scopeOf(x), r.full_name)).reduce<GrantLevel>((acc, x) => (levelAtLeast(x.level, acc) ? x.level : acc), "lectura");
+                const canWrite = levelAtLeast(best, "completo") && r.permissions?.push !== false;
                 seen.set(
                   r.full_name,
-                  `- ${r.full_name}${r.private ? " (privado)" : ""}${r.archived ? " (archivado)" : ""} · ${canWrite ? "completo" : level === "completo" ? "lectura (la cuenta no puede escribir)" : "lectura"}${r.pushed_at ? ` · último push ${day(r.pushed_at)}` : ""}${r.description ? ` · ${r.description.slice(0, 100)}` : ""}`,
+                  `- ${r.full_name}${r.private ? " (privado)" : ""}${r.archived ? " (archivado)" : ""} · ${canWrite ? best : levelAtLeast(level, "completo") ? "lectura (la cuenta no puede escribir)" : "lectura"}${r.pushed_at ? ` · último push ${day(r.pushed_at)}` : ""}${r.description ? ` · ${r.description.slice(0, 100)}` : ""}`,
                 );
               }
             }
@@ -374,5 +380,125 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
       }),
     ),
   ];
-  return [...read, ...write];
+  if (!adminRepos.length) return [...read, ...write];
+
+  // ── Admin: lo de más alcance. GitHub sigue aplicando sus protecciones de rama. ──
+  const FAILED = ["failure", "cancelled", "timed_out", "action_required", "startup_failure"];
+  const admin: ToolDef[] = [
+    defineTool(
+      "github_fusionar_pr",
+      "Fusiona un pull request abierto. No lo hace si es borrador, tiene conflictos o algún check falla o sigue en marcha (salvo ignorar_checks). Por defecto squash y borra la rama del PR al terminar.",
+      {
+        ...repoShape(adminRepos),
+        numero: z.number().int().min(1),
+        metodo: z.enum(["squash", "merge", "rebase"]).optional().describe("squash (por defecto), merge o rebase"),
+        titulo: z.string().max(250).optional().describe("Título del commit de fusión"),
+        borrar_rama: z.boolean().optional().describe("Borrar la rama del PR después (por defecto sí)"),
+        ignorar_checks: z.boolean().optional().describe("Fusionar aunque haya checks fallando o pendientes (solo si el usuario lo pidió)"),
+      },
+      run("admin", async (api, a: { numero: number; metodo?: "squash" | "merge" | "rebase"; titulo?: string; borrar_rama?: boolean; ignorar_checks?: boolean }) => {
+        let pr = await api.pull(a.numero);
+        if (pr.merged) return `El PR #${a.numero} ya estaba fusionado.`;
+        if (pr.state !== "open") throw new Error(`El PR #${a.numero} está cerrado.`);
+        if (pr.draft) throw new Error(`El PR #${a.numero} es un borrador: márcalo como listo antes.`);
+        // GitHub calcula «mergeable» en segundo plano: si aún no lo sabe, se le da un momento.
+        if (pr.mergeable === null || pr.mergeable === undefined) {
+          await new Promise((r) => setTimeout(r, 1500));
+          pr = await api.pull(a.numero);
+        }
+        if (pr.mergeable === false) throw new Error(`El PR #${a.numero} tiene conflictos con ${pr.base.ref}: hay que resolverlos antes.`);
+        if (pr.head.sha && !a.ignorar_checks) {
+          const runs = (await api.checkRuns(pr.head.sha)).check_runs;
+          const failed = runs.filter((r) => r.status === "completed" && FAILED.includes(r.conclusion ?? ""));
+          const pending = runs.filter((r) => r.status !== "completed");
+          if (failed.length) throw new Error(`Checks en rojo: ${failed.map((r) => r.name).join(", ")}. No se fusiona.`);
+          if (pending.length) throw new Error(`Checks aún en marcha: ${pending.map((r) => r.name).join(", ")}. Vuelve a intentarlo cuando acaben.`);
+        }
+        const merged = await api.mergePull(a.numero, { merge_method: a.metodo ?? "squash", commit_title: a.titulo, sha: pr.head.sha });
+        if (!merged.merged) throw new Error(merged.message || "GitHub no lo ha fusionado.");
+        audit(api, `fusiona el PR #${a.numero} «${pr.title}» en ${pr.base.ref} (${a.metodo ?? "squash"})`, pr.html_url);
+        let tail = "";
+        const sameRepo = !pr.head.repo || pr.head.repo.full_name.toLowerCase() === api.full.toLowerCase();
+        if ((a.borrar_rama ?? true) && sameRepo && pr.head.ref !== (await api.defaultBranch())) {
+          try {
+            await api.deleteBranch(pr.head.ref);
+            tail = ` Rama ${pr.head.ref} borrada.`;
+          } catch {
+            tail = ` No se pudo borrar la rama ${pr.head.ref} (quizá está protegida).`;
+          }
+        }
+        return `PR #${a.numero} fusionado en ${pr.base.ref} (${merged.sha.slice(0, 7)}).${tail}`;
+      }),
+    ),
+    defineTool(
+      "github_revisar_pr",
+      "Deja una revisión en un pull request: aprobar, pedir cambios o solo comentar. GitHub no deja aprobar un PR propio de la cuenta.",
+      {
+        ...repoShape(adminRepos),
+        numero: z.number().int().min(1),
+        veredicto: z.enum(["aprobar", "pedir_cambios", "comentar"]),
+        texto: z.string().min(1).max(20_000),
+      },
+      run("admin", async (api, a: { numero: number; veredicto: "aprobar" | "pedir_cambios" | "comentar"; texto: string }) => {
+        const event = a.veredicto === "aprobar" ? "APPROVE" : a.veredicto === "pedir_cambios" ? "REQUEST_CHANGES" : "COMMENT";
+        const r = await api.review(a.numero, { event, body: sign(a.texto) });
+        audit(api, `revisa el PR #${a.numero}: ${a.veredicto.replace("_", " ")}`, r.html_url);
+        return `Revisión enviada (${a.veredicto.replace("_", " ")}): ${r.html_url}`;
+      }),
+    ),
+    defineTool(
+      "github_cerrar_pr",
+      "Cierra un pull request sin fusionarlo, con un comentario que explique por qué.",
+      { ...repoShape(adminRepos), numero: z.number().int().min(1), motivo: z.string().min(1).max(5000) },
+      run("admin", async (api, a: { numero: number; motivo: string }) => {
+        await api.comment(a.numero, sign(a.motivo));
+        const pr = await api.closePull(a.numero);
+        audit(api, `cierra el PR #${a.numero} sin fusionar`, pr.html_url);
+        return `PR #${a.numero} cerrado.`;
+      }),
+    ),
+    defineTool(
+      "github_borrar_rama",
+      "Borra una rama (nunca la principal del repo; GitHub tampoco deja borrar las protegidas).",
+      { ...repoShape(adminRepos), rama: z.string() },
+      run("admin", async (api, a: { rama: string }) => {
+        const rama = safeBranch(a.rama);
+        if (rama === (await api.defaultBranch())) throw new Error(`«${rama}» es la rama principal: no se borra.`);
+        await api.deleteBranch(rama);
+        audit(api, `borra la rama ${rama}`);
+        return `Rama ${rama} borrada.`;
+      }),
+    ),
+    defineTool(
+      "github_crear_repo",
+      "Crea un repositorio nuevo (privado por defecto, con README inicial) en tu cuenta o en una organización, siempre dentro de tu acceso admin.",
+      {
+        nombre: z.string().min(1).max(100),
+        descripcion: z.string().max(350).optional(),
+        privado: z.boolean().optional().describe("Por defecto true"),
+        propietario: z.string().optional().describe("Organización (o tu usuario); por defecto, tu cuenta"),
+      },
+      async (a) => {
+        try {
+          const g = grants.find((x) => x.level === "admin")!;
+          const { transport } = await resolveTransport(g.connection);
+          const login = (await currentUser(transport)).login;
+          const owner = (a.propietario ?? login).trim();
+          const full = `${owner}/${a.nombre.trim()}`;
+          // El repo nuevo tiene que caer dentro de un acceso admin (p. ej. «*» o «propietario/*»).
+          if (!grants.some((x) => x.level === "admin" && isWildcard(scopeOf(x)) && inScope(scopeOf(x), full))) {
+            return fail(`Para crear repos en «${owner}» hace falta un acceso admin que lo cubra («${owner}/*» o «*»).`);
+          }
+          const repo = await createRepo(transport, { owner, name: a.nombre, description: a.descripcion, private: a.privado ?? true }, login);
+          ctx.note(`GitHub · crea el repo ${repo.full_name}${repo.private ? " (privado)" : ""}`, { kind: "github", repo: repo.full_name, url: repo.html_url });
+          logActivity("conexion", `${ctx.agent.name} crea el repo ${repo.full_name} en GitHub`, ctx.agent.id, { repo: repo.full_name, url: repo.html_url, taskId: ctx.task.id });
+          return ok(`Repo creado: ${repo.html_url} (${repo.private ? "privado" : "público"}, rama ${repo.default_branch}).`);
+        } catch (err) {
+          return fail(`GitHub: ${redact((err as Error).message)}`);
+        }
+      },
+    ),
+  ];
+
+  return [...read, ...write, ...admin];
 }

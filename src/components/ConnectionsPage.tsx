@@ -519,6 +519,7 @@ function Grants({ conn, service, patch }: { conn: ConnView; service?: ServiceInf
               <option value="">Sin acceso</option>
               <option value="lectura">Lectura</option>
               {!service?.readOnly && <option value="completo">Completo</option>}
+              {service?.levels.admin && <option value="admin">Admin</option>}
             </select>
           </label>
         ))}
@@ -531,6 +532,11 @@ function Grants({ conn, service, patch }: { conn: ConnView; service?: ServiceInf
           {!service.readOnly && (
             <li>
               <strong>Completo:</strong> {service.levels.completo}
+            </li>
+          )}
+          {service.levels.admin && (
+            <li>
+              <strong>Admin:</strong> {service.levels.admin}
             </li>
           )}
         </ul>

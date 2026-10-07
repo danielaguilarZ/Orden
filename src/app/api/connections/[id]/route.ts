@@ -59,6 +59,7 @@ export const PATCH = route<IdCtx>(async (req, { params }) => {
     if (!getAgent(agentId)) throw new Error("Ese agente no existe.");
     if (level !== null && !GRANT_LEVELS.includes(level)) throw new Error("Nivel de permiso no válido.");
     if (level === "completo" && service.readOnly) throw new Error(`${service.label} es solo de lectura: el permiso máximo es «lectura».`);
+    if (level === "admin" && !service.levels.admin) throw new Error(`${service.label} no tiene nivel «admin»: el permiso máximo es «completo».`);
     setGrant(id, agentId, level);
     logActivity("equipo", `${getAgent(agentId)!.name}: ${level ? `acceso ${level}` : "sin acceso"} a «${c.name}»`, agentId);
   }

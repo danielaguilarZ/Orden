@@ -7,13 +7,14 @@ import { redact } from "../../secrets";
 const LEVEL_TEXT = {
   lectura: "leer código, commits, issues y PRs, buscar y comentar",
   completo: "lo anterior y crear/editar issues, crear ramas, hacer commits y abrir PRs",
+  admin: "lo anterior y fusionar PRs, revisarlos (aprobar o pedir cambios), cerrarlos, borrar ramas y crear repos",
 };
 
 registerService({
   key: "github",
   label: "GitHub",
   description: "Repositorios de GitHub. Acceso con el GitHub CLI (gh) del PC o con un token fine-grained guardado cifrado.",
-  levels: { lectura: `Lectura: ${LEVEL_TEXT.lectura}`, completo: `Completo: ${LEVEL_TEXT.completo}` },
+  levels: { lectura: `Lectura: ${LEVEL_TEXT.lectura}`, completo: `Completo: ${LEVEL_TEXT.completo}`, admin: `Admin: ${LEVEL_TEXT.admin}. Para crear repos, la conexión tiene que cubrir varios («propietario/*» o «*»).` },
   fields: [
     {
       key: "repo",
@@ -38,9 +39,12 @@ registerService({
 ${grants.map((g) => `- ${isWildcard(String(g.connection.config.repo)) ? `Acceso a ${scopeLabel(String(g.connection.config.repo))}` : `Repo ${String(g.connection.config.repo)}`} · tu permiso: ${g.level} (${LEVEL_TEXT[g.level]}).`).join("\n")}
 - Usa las herramientas github_*. Solo puedes trabajar en ${grants.length > 1 || grants.some((g) => isWildcard(String(g.connection.config.repo))) ? "esos repos" : "ese repo"}; no hay acceso a otros.${grants.some((g) => isWildcard(String(g.connection.config.repo))) ? "\n- Con acceso a varios repos, github_repos te dice cuáles hay; indica siempre el repo («propietario/nombre»)." : ""}
 - Lo que publiques (comentarios, issues, PRs) se firma como agente de Orden. Sé breve y concreto.${
-      grants.some((g) => g.level === "completo")
-        ? "\n- Para cambiar código: github_crear_rama → github_commit (archivos con su contenido completo) → github_crear_pr. Nunca hay commits directos en la rama principal ni fusiones: el usuario revisa y fusiona."
-        : ""
+      grants.some((g) => g.level === "admin")
+        ? "\n- Para cambiar código: github_crear_rama → github_commit (archivos con su contenido completo) → github_crear_pr. Nunca hay commits directos en la rama principal: todo pasa por un PR." +
+          "\n- Con permiso admin puedes fusionar (github_fusionar_pr), revisar, cerrar PRs, borrar ramas y crear repos. Antes de fusionar, revisa el PR (github_ver) y que sea seguro: fusionar en la rama principal puede desplegar a producción. No fusiones PRs de otras personas que no te hayan pedido revisar, ni con checks en rojo, salvo que el usuario lo pida expresamente."
+        : grants.some((g) => g.level === "completo")
+          ? "\n- Para cambiar código: github_crear_rama → github_commit (archivos con su contenido completo) → github_crear_pr. Nunca hay commits directos en la rama principal ni fusiones: el usuario revisa y fusiona."
+          : ""
     }`;
   },
   async test(c) {

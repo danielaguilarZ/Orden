@@ -17,7 +17,7 @@ export interface ServiceInfo {
   label: string;
   description: string;
   /** Qué permite cada nivel (se muestra en la interfaz). */
-  levels: Record<GrantLevel, string>;
+  levels: { lectura: string; completo: string; admin?: string };
   /** Campos de configuración que pide la interfaz. */
   fields: { key: string; label: string; placeholder?: string; hint?: string; presets?: { label: string; value: string }[] }[];
   /** Admite credencial guardada (token) además de la del sistema. */
