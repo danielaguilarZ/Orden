@@ -2,13 +2,49 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, onEvent, openDecor, useStore } from "@/client/store";
-import type { LivingScene } from "@/living/scene";
+import type { FloorInfo, LivingScene } from "@/living/scene";
 import { currentRoom } from "@/living/presence";
 import { skyAt, skyCssVars, type Sky } from "@/living/sky";
 import { AgentDrawer, STATUS_LABEL } from "./AgentDrawer";
 import { AgentForm } from "./AgentForm";
 import { AvatarPreview } from "./AvatarPreview";
 import { DecorMode } from "./DecorMode";
+
+/**
+ * Selector de plantas de la torre (como el panel de un ascensor): subir, bajar
+ * o ir directo a una planta. Arriba, la más alta.
+ */
+function FloorPicker({ level, floors, disabled, onPick }: { level: number; floors: FloorInfo[]; disabled: boolean; onPick: (level: number) => void }) {
+  const levels = floors.map((f) => f.level);
+  const min = Math.min(...levels);
+  const max = Math.max(...levels);
+  return (
+    <nav className="floor-picker" aria-label="Plantas">
+      <button className="btn ghost small" disabled={disabled || level >= max} onClick={() => onPick(level + 1)} title="Subir una planta">
+        ▲
+      </button>
+      <ol>
+        {[...floors].reverse().map((f) => (
+          <li key={f.level}>
+            <button
+              className={f.level === level ? "on" : ""}
+              disabled={disabled}
+              onClick={() => onPick(f.level)}
+              title={f.rooms ? `${f.rooms} sala${f.rooms === 1 ? "" : "s"}` : "Planta diáfana (aún sin salas)"}
+            >
+              <span className="fp-num">{f.level === 0 ? "B" : f.level}</span>
+              <span className="fp-name">{f.label.replace(/^Planta (baja|\d+) · /, "")}</span>
+              {f.agents > 0 && <span className="fp-count">{f.agents}</span>}
+            </button>
+          </li>
+        ))}
+      </ol>
+      <button className="btn ghost small" disabled={disabled || level <= min} onClick={() => onPick(level - 1)} title="Bajar una planta">
+        ▼
+      </button>
+    </nav>
+  );
+}
 
 /** Living isométrico. PixiJS solo se carga en el navegador. */
 export function LivingView() {
@@ -25,6 +61,8 @@ export function LivingView() {
   const [order, setOrder] = useState("");
   const [sending, setSending] = useState(false);
   const chief = agents.find((a) => a.isChief);
+  // Plantas de la torre y la que se ve (las manda la escena).
+  const [floorState, setFloorState] = useState<{ level: number; floors: FloorInfo[] }>({ level: 0, floors: [] });
   // El cielo solo se calcula en el navegador (hora local) y se refresca cada minuto.
   const [sky, setSky] = useState<Sky | null>(null);
 
@@ -43,6 +81,7 @@ export function LivingView() {
       scene = await LivingScene.create(hostRef.current, overlayRef.current, {
         onSelect: setSelected,
         onUsageClick: () => api("/api/claude/usage", { method: "POST" }).catch(() => {}),
+        onFloors: setFloorState,
       });
       if (cancelled) {
         scene.destroy();
@@ -147,6 +186,15 @@ export function LivingView() {
             })}
           </ul>
         </section>
+
+        {floorState.floors.length > 1 && (
+          <FloorPicker
+            level={floorState.level}
+            floors={floorState.floors}
+            disabled={decorating}
+            onPick={(level) => sceneRef.current?.setLevel(level)}
+          />
+        )}
 
         <form
           className="command-bar"

@@ -115,13 +115,22 @@ describe("plano de sala (con la casa)", () => {
     };
   }
 
-  it("puertas reales entre salas y pasarela entre edificios", () => {
+  it("puertas reales entre salas; entre plantas no hay pasarela (se va en ascensor)", () => {
     createBlankRoom({ name: "Taller" });
+    // Una zona sin planta propia va a la planta baja: otra planta, sin pasarela.
     buildRoom({ name: "Anexo", domain: "estudio", building: "anexo", empty: true });
     const rooms = listRooms();
     const all = rooms.flatMap((r) => roomOpenings(r, rooms).map((o) => ({ room: r.name, ...o })));
     expect(all.some((o) => !o.walkway)).toBe(true);
-    const bridge = all.filter((o) => o.walkway);
+    expect(all.filter((o) => o.walkway)).toHaveLength(0);
+  });
+
+  it("dos zonas en la misma planta sí se unen con una pasarela", () => {
+    const rooms = [
+      { ...listRooms()[0], id: "a", building: "orden", level: 0, x: 0, y: 0 },
+      { ...listRooms()[0], id: "b", building: "anexo", level: 0, x: 16, y: 0 },
+    ];
+    const bridge = rooms.flatMap((r) => roomOpenings(r, rooms)).filter((o) => o.walkway);
     expect(bridge).toHaveLength(2);
     expect(new Set(bridge.map((b) => b.side))).toEqual(new Set(["este", "oeste"]));
   });

@@ -551,4 +551,39 @@ export const migrations: Migration[] = [
       for (const r of group) move.run(r.x + shift.x, r.y + shift.y, r.id);
     },
   },
+  {
+    version: 17,
+    name: "plantas de la torre",
+    up: (db) => {
+      // Cada sala pasa a tener planta (`level`). Para que caminos, puertas y
+      // muros sigan siendo 2D, cada planta vive en su franja del plano: x desde
+      // level × 200 (LEVEL_STRIDE en living/house.ts; aquí fijo a propósito).
+      // Cada zona se traslada entera a su planta (misma distribución, puertas y
+      // muebles; los ids no cambian, así que puestos y despachos se conservan).
+      db.exec("ALTER TABLE rooms ADD COLUMN level INTEGER NOT NULL DEFAULT 0");
+      const STRIDE = 200;
+      const LEVELS: Record<string, number> = { orden: 1, marketing: 2 };
+      const rows = db.prepare("SELECT id, x, y, building, archived_at FROM rooms").all() as {
+        id: string;
+        x: number;
+        y: number;
+        building: string | null;
+        archived_at: string | null;
+      }[];
+      const zones = new Map<string, typeof rows>();
+      for (const r of rows) {
+        const zone = r.building || "orden";
+        zones.set(zone, [...(zones.get(zone) ?? []), r]);
+      }
+      const move = db.prepare("UPDATE rooms SET level = ?, x = ?, y = ? WHERE id = ?");
+      for (const [zone, list] of zones) {
+        const level = LEVELS[zone] ?? 0;
+        // La esquina de la zona (de sus salas en uso, si hay) pasa a la esquina de su planta.
+        const ref = list.some((r) => !r.archived_at) ? list.filter((r) => !r.archived_at) : list;
+        const minX = Math.min(...ref.map((r) => r.x));
+        const minY = Math.min(...ref.map((r) => r.y));
+        for (const r of list) move.run(level, r.x - minX + level * STRIDE, r.y - minY, r.id);
+      }
+    },
+  },
 ];

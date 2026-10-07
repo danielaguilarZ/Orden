@@ -10,6 +10,7 @@ interface RoomRow {
   kind: string;
   agent_id: string | null;
   building: string | null;
+  level: number | null;
   x: number;
   y: number;
   w: number;
@@ -36,6 +37,7 @@ function toRoom(r: RoomRow): Room {
     kind: r.kind,
     agentId: r.agent_id,
     building: r.building || "orden",
+    level: r.level ?? 0,
     x: r.x,
     y: r.y,
     w: r.w,
@@ -70,6 +72,8 @@ export interface NewRoom {
   agentId?: string | null;
   /** Edificio (por defecto, la casa de Orden). */
   building?: string;
+  /** Planta de la torre (x ya incluye su franja del plano). */
+  level?: number;
   x: number;
   y: number;
   w: number;
@@ -83,8 +87,8 @@ export function createRoom(input: NewRoom): Room {
   const ts = now();
   getDb()
     .prepare(
-      `INSERT INTO rooms (id, name, kind, agent_id, building, x, y, w, d, style, furniture, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO rooms (id, name, kind, agent_id, building, level, x, y, w, d, style, furniture, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       id,
@@ -92,6 +96,7 @@ export function createRoom(input: NewRoom): Room {
       input.kind,
       input.agentId ?? null,
       input.building ?? "orden",
+      input.level ?? 0,
       input.x,
       input.y,
       input.w,

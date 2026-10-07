@@ -84,9 +84,15 @@ export interface Room {
   /** Tema de la sala: despacho, finanzas, biblioteca, cocina… */
   kind: string;
   agentId: string | null;
-  /** Edificio al que pertenece: «orden» (la casa, por defecto) u otro de `BUILDINGS`. */
+  /** Zona (planta temática) a la que pertenece: «orden» (trading, por defecto) u otra de `BUILDINGS`. */
   building?: string;
-  /** Posición y tamaño en baldosas dentro de la casa. */
+  /**
+   * Planta de la torre (0 = planta baja). Cada planta ocupa su propia franja
+   * del plano: x incluye `level × LEVEL_STRIDE` (ver living/house.ts) y al
+   * dibujarla se sube la altura de un piso (living/floors.ts).
+   */
+  level?: number;
+  /** Posición y tamaño en baldosas dentro de la casa (plano lógico, con la franja de su planta). */
   x: number;
   y: number;
   w: number;

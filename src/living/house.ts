@@ -40,11 +40,29 @@ export function slotOrder(count: number): Point[] {
   return out;
 }
 
-// ───────────── Plantas de arriba ─────────────
-// En la vista isométrica, «arriba» en pantalla es la diagonal hacia x e y
-// negativos. Una planta de arriba (p. ej. la de marketing, a la que se sube en
-// ascensor) se coloca ahí, centrada en horizontal sobre el resto, y crece
-// alejándose (hacia arriba). Así se ve encima sin cambiar cómo se dibuja.
+// ───────────── Plantas de la torre ─────────────
+// Cada sala tiene su planta (`level`, 0 = planta baja). Para que la lógica de
+// caminos, puertas y muros siga siendo 2D, cada planta ocupa su propia franja
+// del plano: sus salas van desde x = level × LEVEL_STRIDE. Al dibujar, cada
+// planta se devuelve a su sitio y se sube la altura de un piso (floors.ts):
+// así todas quedan apiladas sobre la misma huella.
+
+/** Baldosas entre el origen de una planta y el de la siguiente en el plano (una planta no puede ser más ancha). */
+export const LEVEL_STRIDE = 200;
+
+/** Planta de una sala (las antiguas, sin dato, en la baja). */
+export function levelOf(room: Pick<Room, "level">): number {
+  return room.level ?? 0;
+}
+
+/** Esquina (en el plano) desde la que crece una planta. */
+export function levelOrigin(level: number): Point {
+  return { x: level * LEVEL_STRIDE, y: 0 };
+}
+
+// ───────────── Plantas de arriba (antiguo, solo para la migración 16) ─────────────
+// Antes de haber plantas de verdad, una «planta de arriba» se colocaba en la
+// diagonal hacia x e y negativos para verse encima. La migración 16 lo usa.
 
 /** ¿Choca este grupo de salas (ya movido) con otras, dejando el hueco entre edificios? */
 function clashes(group: Area[], others: Area[]): boolean {
@@ -82,29 +100,17 @@ export function upperShift(group: Area[], others: Area[]): Point {
 /**
  * Primera posición libre para una sala nueva (en baldosas) dentro de su
  * edificio. Cada edificio crece en cuadrado desde su esquina; uno nuevo
- * empieza a la derecha de todo lo construido, dejando `BUILDING_GAP` de hueco.
+ * empieza en `origin` (la esquina de su planta) o, sin ella, a la derecha de
+ * todo lo construido, dejando `BUILDING_GAP` de hueco.
  * Nunca se pega a otro edificio: entre ellos siempre queda ese hueco.
- * Con `above`, el edificio es una planta de arriba (ver `upperShift`).
+ * Pásale solo las salas de la misma planta.
  */
-export function nextRoomPosition(rooms: (Area & Pick<Room, "building">)[], building = DEFAULT_BUILDING, opts: { above?: boolean } = {}): Point {
+export function nextRoomPosition(rooms: (Area & Pick<Room, "building">)[], building = DEFAULT_BUILDING, opts: { origin?: Point } = {}): Point {
   const mine = rooms.filter((r) => buildingOf(r) === building);
   const others = rooms.filter((r) => buildingOf(r) !== building);
-  if (opts.above && others.length) {
-    // Crece desde la sala más cercana a las de abajo, alejándose de ellas.
-    const origin = mine.length
-      ? { x: Math.max(...mine.map((r) => r.x)), y: Math.max(...mine.map((r) => r.y)) }
-      : upperShift([{ x: 0, y: 0, w: ROOM_SIZE, d: ROOM_SIZE }], others);
-    for (const slot of slotOrder(400)) {
-      const cand = { x: origin.x - slot.x * ROOM_SIZE, y: origin.y - slot.y * ROOM_SIZE, w: ROOM_SIZE, d: ROOM_SIZE };
-      if (rooms.some((r) => overlaps(cand, r))) continue;
-      if (others.some((r) => overlaps(cand, r, BUILDING_GAP))) continue;
-      return { x: cand.x, y: cand.y };
-    }
-    throw new Error("La casa está llena");
-  }
-  let origin: Point = { x: 0, y: 0 };
+  let origin: Point = opts.origin ?? { x: 0, y: 0 };
   if (mine.length) origin = { x: Math.min(...mine.map((r) => r.x)), y: Math.min(...mine.map((r) => r.y)) };
-  else if (others.length) origin = { x: Math.max(...others.map((r) => r.x + r.w)) + BUILDING_GAP, y: Math.min(...others.map((r) => r.y)) };
+  else if (others.length && !opts.origin) origin = { x: Math.max(...others.map((r) => r.x + r.w)) + BUILDING_GAP, y: Math.min(...others.map((r) => r.y)) };
   for (const slot of slotOrder(400)) {
     const cand = { x: origin.x + slot.x * ROOM_SIZE, y: origin.y + slot.y * ROOM_SIZE, w: ROOM_SIZE, d: ROOM_SIZE };
     if (rooms.some((r) => overlaps(cand, r))) continue;
@@ -155,21 +161,27 @@ function buildingOrder(rooms: Pick<Room, "building">[]): string[] {
   return order;
 }
 
+/** Plantas con alguna sala, de abajo arriba. */
+export function levelsOf(rooms: Pick<Room, "level">[]): number[] {
+  return [...new Set(rooms.map(levelOf))].sort((a, b) => a - b);
+}
+
 // ───────────── Ascensor entre plantas ─────────────
-// Un edificio que tiene ascensor (y la casa de Orden también) no se une con
-// pasarela: se sube en ascensor. Se entra por la baldosa de delante de las
-// puertas de un ascensor y se sale por la de delante del otro.
+// El núcleo de ascensores une todas las plantas: cada planta con un mueble
+// «ascensor» tiene una parada (la baldosa de delante de sus puertas) y desde
+// cualquier parada se llega a cualquier otra. Se entra por una y se sale por
+// la otra (en el living, el agente desaparece un momento).
 
 /** Mueble que hace de ascensor. */
 export const ELEVATOR_KIND = "ascensor";
 
-/** Parada de ascensor: baldosa (de la casa) delante de sus puertas. */
+/** Parada de ascensor: baldosa (del plano) delante de sus puertas. */
 export interface ElevatorStop extends Point {
   roomId: string;
-  building: string;
+  level: number;
 }
 
-/** Une la parada de la casa de Orden con la de otro edificio. */
+/** Une las paradas de dos plantas. */
 export interface ElevatorLink {
   id: string;
   stops: [ElevatorStop, ElevatorStop];
@@ -186,48 +198,48 @@ function occupied(room: Room, x: number, y: number): boolean {
 }
 
 /**
- * Parada del primer ascensor de un edificio: la primera baldosa libre delante
+ * Parada del primer ascensor de una planta: la primera baldosa libre delante
  * de sus puertas (sin girar, las puertas miran al sur; girado, al este).
  */
-export function elevatorStop(rooms: Room[], building: string): ElevatorStop | null {
+export function elevatorStop(rooms: Room[], level: number): ElevatorStop | null {
   for (const room of rooms) {
-    if (buildingOf(room) !== building) continue;
+    if (levelOf(room) !== level) continue;
     for (const f of room.furniture) {
       if (f.kind !== ELEVATOR_KIND) continue;
       const free = entranceTiles(f).find((p) => p.x >= 0 && p.y >= 0 && p.x < room.w && p.y < room.d && !occupied(room, p.x, p.y));
-      if (free) return { x: room.x + free.x, y: room.y + free.y, roomId: room.id, building };
+      if (free) return { x: room.x + free.x, y: room.y + free.y, roomId: room.id, level };
     }
   }
   return null;
 }
 
-/** Ascensores que unen cada edificio con la casa de Orden (si ambos tienen uno). */
+/** Núcleo de ascensores: une cada par de plantas que tengan parada. */
 export function computeElevators(rooms: Room[]): ElevatorLink[] {
-  const order = buildingOrder(rooms);
-  if (order.length < 2) return [];
-  const base = elevatorStop(rooms, order[0]);
-  if (!base) return [];
+  const stops = levelsOf(rooms)
+    .map((l) => elevatorStop(rooms, l))
+    .filter((s): s is ElevatorStop => Boolean(s));
   const out: ElevatorLink[] = [];
-  for (const b of order.slice(1)) {
-    const stop = elevatorStop(rooms, b);
-    if (stop) out.push({ id: `ascensor:${b}`, stops: [base, stop] });
-  }
+  for (let i = 0; i < stops.length; i++)
+    for (let j = i + 1; j < stops.length; j++) out.push({ id: `ascensor:${stops[i].level}-${stops[j].level}`, stops: [stops[i], stops[j]] });
   return out;
 }
 
 /**
- * Pasarelas que unen cada edificio con el primero (la casa de Orden): la más
- * corta entre dos salas enfrentadas, alineada con sus puertas centrales y sin
- * atravesar ninguna sala. Los edificios unidos por ascensor no llevan pasarela.
+ * Pasarelas entre edificios de una misma planta: unen cada uno con el primero
+ * de esa planta por la línea más corta entre dos salas enfrentadas, alineada
+ * con sus puertas centrales y sin atravesar ninguna sala. Entre plantas
+ * distintas no hay pasarela: se sube en ascensor.
  */
 export function computeWalkways(rooms: Room[]): Walkway[] {
+  return levelsOf(rooms).flatMap((level) => walkwaysOnLevel(rooms.filter((r) => levelOf(r) === level)));
+}
+
+function walkwaysOnLevel(rooms: Room[]): Walkway[] {
   const order = buildingOrder(rooms);
   if (order.length < 2) return [];
   const base = rooms.filter((r) => buildingOf(r) === order[0]);
-  const byElevator = new Set(computeElevators(rooms).map((l) => l.stops[1].building));
   const out: Walkway[] = [];
   for (const b of order.slice(1)) {
-    if (byElevator.has(b)) continue;
     let best: Walkway | null = null;
     const id = `pasarela:${b}`;
     const consider = (cand: Walkway) => {

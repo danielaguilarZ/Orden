@@ -1,4 +1,4 @@
-import { buildingOf, computeWalkways, roomsConnected } from "./house";
+import { buildingOf, computeWalkways, elevatorStop, levelOf, levelsOf, roomsConnected } from "./house";
 import { BUILDINGS } from "../lib/roomTemplates";
 import type { Agent, Room } from "../lib/types";
 
@@ -50,6 +50,12 @@ export function checkRoomRemoval(room: Room, rooms: Room[], agents: AgentRef[]):
   const after = new Set(computeWalkways(rest).map((w) => w.id));
   const lost = [...before].filter((id) => !after.has(id));
   if (lost.length) return block("Es la sala por la que entra la pasarela entre los edificios y no hay otra por la que pueda entrar.");
+  // El ascensor de su planta: sin él, la planta quedaría incomunicada.
+  const level = levelOf(room);
+  const stopBefore = elevatorStop(rooms, level);
+  if (levelsOf(rooms).length > 1 && stopBefore?.roomId === room.id && !elevatorStop(rest, level)) {
+    return block("Aquí está el ascensor de su planta: sin él no se podría llegar. Pon otro ascensor en otra sala de la planta antes de borrarla.");
+  }
 
   const relocate = agents.filter((a) => a.roomId === room.id).map(({ id, name }) => ({ id, name }));
   return { blocked: null, relocate, visitors };

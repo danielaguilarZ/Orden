@@ -11,7 +11,7 @@
 
 import { DESK_SETS, doorTiles } from "./decorator";
 import { FURNITURE, footprint } from "./furniture";
-import { buildingOf, computeDoors, computeWalkways, walkwayDoors } from "./house";
+import { buildingOf, computeDoors, computeWalkways, levelOf, walkwayDoors } from "./house";
 import { cellsOf, checkItem, layoutWarnings, surfaceAt, topsOf, wallSpan, type EditContext } from "./roomEditor";
 import { currentRoom, roomOwnerLabel } from "./presence";
 import type { Agent, FurnitureItem, Room } from "../lib/types";
@@ -429,7 +429,8 @@ export function describeRoomLayout(room: Room, rooms: Room[], agents: Agent[], c
   const name = (it: FurnitureItem) => `${label(it.kind)}${marks.get(it.id) ? ` ${marks.get(it.id)}` : ""} [${ids.get(it.id)}]`;
 
   const out: string[] = [];
-  out.push(`Sala «${room.name}» (${roomOwnerLabel(room, agents)} · edificio ${building}) · ${room.w}×${room.d} baldosas: x de 0 a ${room.w - 1} (→), y de 0 a ${room.d - 1} (↓).`);
+  const floor = levelOf(room) === 0 ? "planta baja" : `planta ${levelOf(room)}`;
+  out.push(`Sala «${room.name}» (${roomOwnerLabel(room, agents)} · ${floor} · edificio ${building}) · ${room.w}×${room.d} baldosas: x de 0 a ${room.w - 1} (→), y de 0 a ${room.d - 1} (↓).`);
   out.push(
     `Puertas: ${
       openings.length

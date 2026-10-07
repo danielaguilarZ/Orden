@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { openDb, setDbForTests } from "@/lib/db";
 import { ensureSeed } from "@/lib/seed";
 import { decorate, doorTiles, removeKinds } from "@/living/decorator";
-import { buildNavGrid, findPath, isFree } from "@/living/house";
+import { buildNavGrid, findPath, isFree, levelOrigin } from "@/living/house";
 import { FURNITURE, footprint } from "@/living/furniture";
 import { pickRoomTemplate, ROOM_TEMPLATES } from "@/lib/roomTemplates";
 import { listRooms } from "@/lib/repo/rooms";
@@ -111,10 +111,13 @@ describe("salas por ámbito", () => {
     const room = listRooms().find((r) => r.id === leo.roomId)!;
     expect(room).toMatchObject({ kind: "oficina", name: "Oficina compartida", agentId: null });
     expect(room.furniture.length).toBeGreaterThan(5);
-    expect([room.x, room.y]).toEqual([10, 0]);
+    // En la planta de trading (su franja del plano empieza en levelOrigin(1)).
+    const o = levelOrigin(1);
+    expect(room.level).toBe(1);
+    expect([room.x, room.y]).toEqual([o.x + 10, 0]);
     const viajes = buildRoom({ name: "Viajes", domain: "vacaciones y viajes" });
     expect(viajes.kind).toBe("viajes");
-    expect([viajes.x, viajes.y]).toEqual([0, 10]);
+    expect([viajes.x, viajes.y]).toEqual([o.x, 10]);
   });
 
   it("la oficina compartida no la elige un ámbito cualquiera", () => {

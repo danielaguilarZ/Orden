@@ -35,7 +35,7 @@ describe("checkRoomRemoval (puro)", () => {
     const a = room("A", 0, 0);
     const t = room("T", 16, 0, { building: "anexo" });
     expect(checkRoomRemoval(t, [a, t], []).blocked).toMatch(/última sala de anexo/);
-    expect(checkRoomRemoval(a, [a, t], []).blocked).toMatch(/última sala de Casa de Orden/);
+    expect(checkRoomRemoval(a, [a, t], []).blocked).toMatch(/última sala de Trading/);
   });
 
   it("no deja borrar la sala propia de un agente", () => {

@@ -10,10 +10,10 @@ import { FURNITURE } from "../../living/furniture";
 import { describeFinishes, FLOOR_FINISHES, WALL_FINISHES } from "../../living/finishes";
 import { DESK_SETS } from "../../living/decorator";
 import { currentRoom, findRoomByRef } from "../../living/presence";
-import { BUILDINGS } from "../roomTemplates";
+import { BUILDINGS, floorLabel } from "../roomTemplates";
 
 const BUILDING_LIST = Object.entries(BUILDINGS)
-  .map(([id, b]) => `${id} (${b.label.toLowerCase()}${b.ascensor ? ", se sube en ascensor: lleva un «ascensor» y la casa necesita otro" : ""})`)
+  .map(([id, b]) => `${id} (${floorLabel(b.level).toLowerCase()})`)
   .join(", ");
 
 const CATALOG = Object.entries(FURNITURE)
@@ -193,18 +193,18 @@ registerTools((ctx) => {
     ),
     defineTool(
       "sala_crear",
-      `Crea una sala común para un ámbito nuevo (sin dueño). Se amuebla sola según el ámbito. Sin edificio, va a la casa de Orden; edificios: ${BUILDING_LIST}. Las salas de un mismo edificio se juntan y se comunican por puertas (varias forman una oficina grande).`,
+      `Crea una sala común para un ámbito nuevo (sin dueño). Se amuebla sola según el ámbito. La casa es una torre de oficinas: «edificio» es la zona, y cada zona tiene su planta; sin edificio, va a orden. Zonas: ${BUILDING_LIST}. Las salas de una misma zona se juntan en su planta y se comunican por puertas (varias forman una oficina grande); entre plantas se va en ascensor (cada planta recibe uno sola).`,
       {
         nombre: z.string(),
         ambito: z.string().describe("p. ej. «cocina y recetas», «viajes», «salud», «diseño web», «despacho de redes sociales»"),
-        edificio: z.string().optional().describe("Id del edificio (por defecto, orden)"),
+        edificio: z.string().optional().describe("Id de la zona/planta (por defecto, orden)"),
       },
       async ({ nombre, ambito, edificio }) => {
         const building = edificio?.trim() || undefined;
         if (building && !BUILDINGS[building]) return fail(`No conozco el edificio «${building}». Edificios: ${BUILDING_LIST}.`);
         const room = buildRoom({ name: nombre, domain: `${ambito} ${nombre}`, building });
         ctx.note(`Ha creado la sala «${room.name}»`, { kind: "room", roomId: room.id });
-        return ok(`Sala «${room.name}» creada (${room.kind}, ${BUILDINGS[room.building ?? "orden"]?.label ?? room.building}).`);
+        return ok(`Sala «${room.name}» creada (${room.kind}, ${floorLabel(room.level ?? 0)}).`);
       },
     ),
     defineTool(

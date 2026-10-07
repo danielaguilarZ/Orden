@@ -27,11 +27,35 @@ export interface RoomTemplate {
  * la casa de Orden; otro edificio = otra entrada aquí y plantillas con su
  * `building` (se une a la casa con una pasarela acristalada).
  */
-export const BUILDINGS: Record<string, { label: string; fallback: string; ascensor?: boolean }> = {
-  orden: { label: "Casa de Orden", fallback: "estudio" },
-  // Planta de marketing: se sube en ascensor (con uno aquí y otro en la casa no lleva pasarela).
-  marketing: { label: "Planta de marketing", fallback: "marketing_abierta", ascensor: true },
+export const BUILDINGS: Record<string, { label: string; fallback: string; level: number }> = {
+  // Cada «edificio» es ahora una zona con planta propia de la torre (`level`).
+  orden: { label: "Trading", fallback: "estudio", level: 1 },
+  marketing: { label: "Marketing", fallback: "marketing_abierta", level: 2 },
 };
+
+/**
+ * Nombres de las plantas de la torre (estilo Pearson Hardman), de abajo
+ * arriba. Las que aún no tienen salas se ven como plantas diáfanas.
+ */
+export const FLOOR_NAMES: Record<number, string> = {
+  0: "Vestíbulo",
+  1: "Trading",
+  2: "Marketing",
+  3: "Legal",
+  4: "Terral Studio",
+  5: "Dirección",
+};
+
+/** Planta en la que se construyen las salas de una zona. */
+export function buildingLevel(building: string): number {
+  return BUILDINGS[building]?.level ?? 0;
+}
+
+/** «Planta 2 · Marketing». */
+export function floorLabel(level: number): string {
+  const name = FLOOR_NAMES[level] ?? Object.values(BUILDINGS).find((b) => b.level === level)?.label;
+  return level === 0 ? `Planta baja${name ? ` · ${name}` : ""}` : `Planta ${level}${name ? ` · ${name}` : ""}`;
+}
 
 export const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
   despacho_zen: {
@@ -175,7 +199,7 @@ export const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
     kinds: ["sofa", "tele", "mesita", "alfombra", "ventana", "cuadro", "planta", "planta", "lampara"],
   },
 
-  // ───────────── Planta de marketing (edificio aparte, se sube en ascensor) ─────────────
+  // ───────────── Planta de marketing (planta 2 de la torre, se sube en ascensor) ─────────────
   marketing_recepcion: {
     kind: "marketing_recepcion",
     label: "Recepción de marketing",

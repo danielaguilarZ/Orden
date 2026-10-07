@@ -644,6 +644,76 @@
   opacity: 1;
 }
 
+/* Selector de plantas de la torre (panel de ascensor). */
+.floor-picker {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 12px;
+  background: rgba(28, 26, 39, 0.9);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(4px);
+  z-index: 3;
+}
+
+.floor-picker ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.floor-picker li button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.floor-picker li button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+}
+
+.floor-picker li button.on {
+  border-color: #e8b04a;
+  color: #ffe3a3;
+  background: rgba(232, 176, 74, 0.12);
+}
+
+.floor-picker .fp-num {
+  min-width: 18px;
+  font-family: var(--font-pixel), monospace;
+  text-align: center;
+}
+
+.floor-picker .fp-name {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.floor-picker .fp-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
 .room-section {
   padding: 14px 16px 0;
 }

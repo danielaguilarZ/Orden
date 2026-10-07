@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { createAgent, getChief, updateAgent } from "./repo/agents";
 import { createRoom, listRooms } from "./repo/rooms";
 import { getPersonality } from "./personalities";
-import { ROOM_TEMPLATES } from "./roomTemplates";
-import { ROOM_SIZE } from "../living/house";
+import { buildingLevel, ROOM_TEMPLATES } from "./roomTemplates";
+import { DEFAULT_BUILDING, levelOrigin, ROOM_SIZE } from "../living/house";
 import { tx } from "./db";
 
 export const ZEN_INSTRUCTIONS = `Eres Zen, el jefe del equipo de asistentes personales de Orden.
@@ -38,13 +38,17 @@ export function ensureSeed() {
     });
     if (listRooms().length === 0) {
       const zenTpl = ROOM_TEMPLATES.despacho_zen;
+      // En la planta de su zona (la de trading), en la esquina de esa planta.
+      const level = buildingLevel(DEFAULT_BUILDING);
+      const origin = levelOrigin(level);
       createRoom({
         id: zenRoomId,
         name: zenTpl.label,
         kind: zenTpl.kind,
         agentId: zen.id,
-        x: 0,
-        y: 0,
+        level,
+        x: origin.x,
+        y: origin.y,
         w: ROOM_SIZE,
         d: ROOM_SIZE,
         style: zenTpl.style,

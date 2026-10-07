@@ -76,11 +76,22 @@ Ejemplos de encargos para Zen:
 Cada agente nuevo recibe un escritorio en una «Oficina compartida» que se abre sola. Las salas por ámbito
 (cocina, biblioteca, gimnasio, viajes…) se crean a demanda y se amueblan solas; también se pueden decorar a mano.
 
-Hay un segundo edificio, la **Planta de marketing** (`edificio: marketing`): sus salas (recepción, despachos y
-sala creativa) se juntan en una oficina grande que se ve **encima** de la casa (en isométrico, «arriba» es la
-diagonal hacia x e y negativos; ver `upperShift` en `house.ts`). Se sube en **ascensor**: la casa recibe uno solo
-y, con otro en la planta, no hay pasarela; los agentes entran por un ascensor y salen por el otro. Un agente puede tener
-**despacho propio** (`sala_asignar`, solo el jefe).
+### Torre de oficinas (plantas)
+
+La casa es una **torre de plantas apiladas** (planta baja · Vestíbulo, 1 · Trading, 2 · Marketing…). Cada sala
+tiene su planta (`rooms.level`); cada zona de `BUILDINGS` (`roomTemplates.ts`) dice en qué planta se construyen
+sus salas, y `FLOOR_NAMES` da los nombres.
+
+- **Lógica 2D intacta:** cada planta vive en su franja del plano (x desde `level × LEVEL_STRIDE`, `house.ts`), así
+  que caminos, puertas, muros y el modo decorar no cambian.
+- **Dibujo apilado:** cada planta va en su capa, devuelta a la huella común y subida `level × STOREY_H` píxeles
+  (`floors.ts`). Por fuera, forjado entre plantas, muro cortina de cristal con montantes, plaza en la planta baja y
+  azotea (`towerRender.ts`).
+- **Vista por plantas:** selector arriba a la derecha del living. La planta elegida se ve entera (sin fachada
+  delantera, como un corte de maqueta); las de debajo, con su fachada; las de encima, en fantasma.
+- **Ascensores:** un núcleo une todas las plantas (un mueble «ascensor» por planta; se pone solo al crear salas en
+  otra planta). Los agentes entran por uno, desaparecen un momento y salen en la otra planta.
+- Un agente puede tener **despacho propio** (`sala_asignar`, solo el jefe).
 
 ### Modo decorar
 
