@@ -55,7 +55,7 @@ También: `servicio:estado`, `servicio:parar`, `servicio:arrancar` y `servicio:q
 
 | Servicio | Qué permite | Credencial |
 | --- | --- | --- |
-| GitHub | Leer y comentar; con permiso completo, ramas, commits y PRs (nunca fusiona). Un repo, todos los de un usuario u organización (`propietario/*`) o todos los tuyos (`*`, botón «Todos mis repos»). | `gh` del PC o token fine-grained cifrado |
+| GitHub | Leer y comentar; con permiso completo, ramas, commits y PRs; con permiso admin, además fusionar PRs (nunca borradores, con conflictos ni con checks en rojo), revisarlos, cerrarlos, borrar ramas (nunca la principal) y crear repos. Un repo, todos los de un usuario u organización (`propietario/*`) o todos los tuyos (`*`, botón «Todos mis repos»). | `gh` del PC o token fine-grained cifrado |
 | Google Calendar | Leer la agenda y volcarla a un panel. Solo lectura. | OAuth en el navegador (calendar.readonly) |
 | Tiempo (clima) | Tiempo actual y previsión hasta 7 días (Open-Meteo). Solo lectura. | Ninguna |
 | Noticias (RSS) | Titulares de las fuentes RSS/Atom que elijas (máx. 15). Solo lectura. | Ninguna |
