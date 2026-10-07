@@ -136,6 +136,7 @@ function apply(e: OrdenEvent) {
       set({ rooms: upsert(state.rooms, p as unknown as Room) });
       break;
     case "system.restarting":
+      restartAt = e.createdAt;
       set({ restarting: String(p.reason ?? "Actualización") });
       break;
     case "usage.updated":
@@ -153,6 +154,18 @@ function apply(e: OrdenEvent) {
 }
 
 let source: EventSource | null = null;
+/** Cuándo se pidió el reinicio en curso (hora del evento system.restarting). */
+let restartAt: string | null = null;
+
+/**
+ * En desarrollo el reinicio solo relanza el worker: la web sigue en pie y la
+ * conexión SSE no se corta, así que no basta con esperar a que se reabra. El
+ * reinicio ha terminado cuando el latido trae un worker arrancado después.
+ */
+function workerRestartedSince(worker: HeartbeatInfo | null, since: string) {
+  const startedAt = worker?.alive ? worker.info.startedAt : undefined;
+  return typeof startedAt === "string" && Date.parse(startedAt) > Date.parse(since);
+}
 
 export function connect() {
   if (source) return;
@@ -172,6 +185,7 @@ export function connect() {
   source.addEventListener("system", (msg) => {
     const data = JSON.parse((msg as MessageEvent).data) as { worker: HeartbeatInfo | null };
     set({ worker: data.worker, live: true });
+    if (state.restarting && restartAt && workerRestartedSince(data.worker, restartAt)) window.location.reload();
   });
 }
 

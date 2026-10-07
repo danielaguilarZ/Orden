@@ -22,7 +22,8 @@ beforeAll(() => {
   repo = fs.mkdtempSync(path.join(os.tmpdir(), "orden-admin-"));
   gitIn(repo, "init", "-q");
   fs.writeFileSync(path.join(repo, "README.md"), "# Juguete\n");
-  fs.writeFileSync(path.join(repo, ".gitignore"), "node_modules/\ndata/\n");
+  // La misma regla que el proyecto: «node_modules» sin barra también ignora el enlace de las copias.
+  fs.writeFileSync(path.join(repo, ".gitignore"), "node_modules\ndata/\n");
   fs.mkdirSync(path.join(repo, "node_modules"));
   gitIn(repo, "add", "-A");
   gitIn(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "inicio");
@@ -49,6 +50,26 @@ beforeEach(() => {
 const result = { type: "result", subtype: "success", result: "Añadido CAMBIOS.md", usage: {}, total_cost_usd: 0, num_turns: 1, duration_ms: 1 };
 
 describe("rol admin", () => {
+  it("el jefe también puede recibir el rol admin", () => {
+    const zen = getChief()!;
+    expect(zen.admin).toBe(false);
+    expect(editAgent(zen.id, { admin: true }).admin).toBe(true);
+    expect(getChief()!.admin).toBe(true);
+  });
+
+  it("el jefe se puede renombrar y sus instrucciones siguen el nombre nuevo", () => {
+    const zen = getChief()!;
+    expect(zen.instructions.startsWith("Eres Zen,")).toBe(true);
+    // El formulario manda las instrucciones de siempre junto con el nombre nuevo.
+    const kai = editAgent(zen.id, { name: "Kai", instructions: zen.instructions });
+    expect(kai.name).toBe("Kai");
+    expect(kai.isChief).toBe(true);
+    expect(kai.instructions.startsWith("Eres Kai, el jefe del equipo")).toBe(true);
+    // Unas instrucciones escritas a mano no se tocan.
+    const propias = editAgent(zen.id, { name: "Leo", instructions: "Coordina con calma." });
+    expect(propias.instructions).toBe("Coordina con calma.");
+  });
+
   it("solo lo activa el usuario, y el equipo sabe quién programa", () => {
     const lucy = hireAgent({ name: "Lucy", specialty: "Desarrolladora", model: "opus" });
     expect(lucy.admin).toBe(false);

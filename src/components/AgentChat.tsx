@@ -107,7 +107,7 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
           <div className="chat-empty">
             <p>
               {agent.isChief
-                ? "Cuéntale a Zen qué necesitas. Lo hará él o lo repartirá entre el equipo."
+                ? `Cuéntale a ${agent.name} qué necesitas. Lo hará él o lo repartirá entre el equipo.`
                 : `Encárgale algo a ${agent.name} directamente.`}
             </p>
             {agent.isChief && (

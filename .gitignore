@@ -1,5 +1,5 @@
 # Dependencias y compilaciones
-node_modules/
+node_modules
 .next/
 .next-a/
 .next-b/

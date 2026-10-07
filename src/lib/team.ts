@@ -105,6 +105,19 @@ export function queueAmbientPhrases(agent: Agent) {
 
 export type AgentEdit = Partial<AgentInput> & { paused?: boolean; admin?: boolean; locationRoomId?: string | null };
 
+/**
+ * Si cambia el nombre, las instrucciones que empiezan por «Eres <nombre>» (las
+ * de Zen al crearse) pasan a usar el nuevo, para que el agente no se presente
+ * con el antiguo. Devuelve undefined si no hay nada que guardar.
+ */
+function renamedInstructions(current: Agent, name: string | undefined, instructions: string | undefined): string | undefined {
+  const text = instructions ?? current.instructions;
+  const renamed = name !== undefined && name.trim() !== current.name;
+  const old = `Eres ${current.name},`;
+  if (!renamed || !text.startsWith(old)) return instructions;
+  return `Eres ${name.trim()},${text.slice(old.length)}`;
+}
+
 export function editAgent(id: string, raw: AgentEdit): Agent {
   const current = getAgent(id);
   if (!current) throw new Error("No existe ese agente.");
@@ -128,10 +141,11 @@ export function editAgent(id: string, raw: AgentEdit): Agent {
     input.personality &&
     (input.personality.preset !== current.personality.preset || input.personality.description !== current.personality.description);
   const preset = input.personality ? getPersonality(input.personality.preset ?? current.personality.preset) : null;
+  const instructions = renamedInstructions(current, input.name, input.instructions);
   const agent = updateAgent(id, {
     ...(input.name !== undefined && { name: input.name }),
     ...(input.specialty !== undefined && { specialty: input.specialty }),
-    ...(input.instructions !== undefined && { instructions: input.instructions }),
+    ...(instructions !== undefined && { instructions }),
     ...(input.model !== undefined && { model: input.model }),
     ...(input.personality && { personality: { ...current.personality, ...input.personality } }),
     ...(input.appearance && { appearance: { ...current.appearance, ...input.appearance } }),
@@ -153,7 +167,7 @@ export function editAgent(id: string, raw: AgentEdit): Agent {
 export function fireAgent(id: string) {
   const agent = getAgent(id);
   if (!agent) return;
-  if (agent.isChief) throw new Error("Zen es el jefe del equipo y no se puede borrar.");
+  if (agent.isChief) throw new Error(`${agent.name} es el jefe del equipo y no se puede borrar.`);
   for (const t of listTasks({ agentId: id, statuses: ACTIVE })) cancelTask(t.id);
   tx(() => {
     // Su sala propia (agentes antiguos) se va con él; su escritorio queda libre para el siguiente.

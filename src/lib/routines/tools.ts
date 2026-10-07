@@ -30,7 +30,7 @@ registerTools((ctx) => {
       async ({ nombre, que_hacer, cuando, agente }) => {
         let target = ctx.agent;
         if (agente && agente.toLowerCase() !== ctx.agent.name.toLowerCase()) {
-          if (!ctx.agent.isChief) return fail("Solo Zen puede programar rutinas para otros agentes.");
+          if (!ctx.agent.isChief) return fail("Solo el jefe del equipo puede programar rutinas para otros agentes.");
           const found = findAgentByName(agente);
           if (!found) return fail(`No hay ningún agente llamado «${agente}».`);
           target = found;
