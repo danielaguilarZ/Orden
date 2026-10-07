@@ -506,6 +506,9 @@ function Credentials({
   );
 }
 
+/** Los textos de nivel ya traen «Lectura: …»; aquí el nombre va en negrita, así que se quita del texto. */
+const bareLevel = (text: string) => text.replace(/^(lectura|completo|admin):\s*/i, "");
+
 /** Nivel de acceso de cada agente y qué permite cada nivel. */
 function Grants({ conn, service, patch }: { conn: ConnView; service?: ServiceInfo; patch: (b: Record<string, unknown>) => Promise<void> }) {
   const agents = useStore((s) => s.agents);
@@ -527,16 +530,16 @@ function Grants({ conn, service, patch }: { conn: ConnView; service?: ServiceInf
       {service && (
         <ul className="muted small conn-levels">
           <li>
-            <strong>Lectura:</strong> {service.levels.lectura}
+            <strong>Lectura:</strong> {bareLevel(service.levels.lectura)}
           </li>
           {!service.readOnly && (
             <li>
-              <strong>Completo:</strong> {service.levels.completo}
+              <strong>Completo:</strong> {bareLevel(service.levels.completo)}
             </li>
           )}
           {service.levels.admin && (
             <li>
-              <strong>Admin:</strong> {service.levels.admin}
+              <strong>Admin:</strong> {bareLevel(service.levels.admin)}
             </li>
           )}
         </ul>
