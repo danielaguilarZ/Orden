@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { archiveRoom, createRoom, deleteRoom, getRoom, listRooms, unarchiveRoom, updateRoom } from "./repo/rooms";
-import { getAgent, listAgents, updateAgent } from "./repo/agents";
+import { getAgent, listAgents, setAgentLocation, updateAgent } from "./repo/agents";
 import { tx } from "./db";
 import { applyTemplateTints, BUILDINGS, DESK_ROOMS, pickRoomTemplate, ROOM_TEMPLATES, type RoomTemplate } from "./roomTemplates";
 import { decorate, DESK_SETS as DESK_SETS_KINDS, removeKinds, type DecorResult } from "../living/decorator";
@@ -36,7 +36,8 @@ export function describeRooms(rooms: Room[], agents: Agent[], me: Pick<Agent, "i
   // Varios edificios: se agrupan (están separados y unidos por una pasarela acristalada).
   const groups = buildings.map((b) => {
     const label = BUILDINGS[b]?.label ?? b;
-    const note = b === DEFAULT_BUILDING ? "" : ` (edificio aparte, edificio=«${b}», unido por una pasarela acristalada)`;
+    const link = BUILDINGS[b]?.ascensor ? "se sube en ascensor" : "unido por una pasarela acristalada";
+    const note = b === DEFAULT_BUILDING ? "" : ` (edificio aparte, edificio=«${b}», ${link})`;
     return `${label}${note}:\n${rooms.filter((r) => buildingOf(r) === b).map(line).join("\n")}`;
   });
   return `${head}\n${groups.join("\n")}`;
@@ -355,6 +356,32 @@ export function removeRoom(roomId: string, opts: { relocate?: boolean } = {}): {
       return { agent: agent.name, room: desk.room.name };
     });
     return { room: archived, relocated };
+  });
+}
+
+/**
+ * Convierte una sala en el despacho propio de un agente: pasa a ser su dueño,
+ * se le asigna una silla de puesto libre de la sala y vuelve a ella. Si tenía
+ * otra sala propia, esa queda común. Su escritorio anterior queda libre.
+ */
+export function assignOwnRoom(roomId: string, agentId: string): { room: Room; agent: Agent } {
+  return tx(() => {
+    const room = getRoom(roomId);
+    if (!room) throw new Error("No existe esa sala.");
+    const agent = getAgent(agentId);
+    if (!agent) throw new Error("No existe ese agente.");
+    if (room.agentId && room.agentId !== agent.id) {
+      const owner = getAgent(room.agentId);
+      throw new Error(`«${room.name}» ya es el despacho de ${owner?.name ?? "otro agente"}.`);
+    }
+    const others = listAgents().filter((a) => a.id !== agent.id);
+    const seat = freeDeskSeat(room, others);
+    if (!seat) throw new Error(`«${room.name}» no tiene ningún puesto libre (silla junto a un escritorio): añade uno antes.`);
+    for (const r of listRooms()) if (r.agentId === agent.id && r.id !== room.id) updateRoom(r.id, { agentId: null });
+    const updated = updateRoom(room.id, { agentId: agent.id });
+    updateAgent(agent.id, { roomId: room.id, deskSeatId: seat.id });
+    setAgentLocation(agent.id, null);
+    return { room: updated, agent: getAgent(agent.id)! };
   });
 }
 

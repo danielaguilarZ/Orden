@@ -1,4 +1,4 @@
-import { FURNITURE, footprint } from "./furniture";
+import { entranceTiles, FURNITURE, footprint } from "./furniture";
 import type { Room } from "../lib/types";
 
 /**
@@ -95,18 +95,86 @@ export interface Walkway extends Area {
   rooms: [string, string];
 }
 
+/** Edificios en orden de aparición (el primero es la casa de Orden). */
+function buildingOrder(rooms: Pick<Room, "building">[]): string[] {
+  const order: string[] = [];
+  for (const r of rooms) if (!order.includes(buildingOf(r))) order.push(buildingOf(r));
+  return order;
+}
+
+// ───────────── Ascensor entre plantas ─────────────
+// Un edificio que tiene ascensor (y la casa de Orden también) no se une con
+// pasarela: se sube en ascensor. Se entra por la baldosa de delante de las
+// puertas de un ascensor y se sale por la de delante del otro.
+
+/** Mueble que hace de ascensor. */
+export const ELEVATOR_KIND = "ascensor";
+
+/** Parada de ascensor: baldosa (de la casa) delante de sus puertas. */
+export interface ElevatorStop extends Point {
+  roomId: string;
+  building: string;
+}
+
+/** Une la parada de la casa de Orden con la de otro edificio. */
+export interface ElevatorLink {
+  id: string;
+  stops: [ElevatorStop, ElevatorStop];
+}
+
+/** ¿Ocupa esa baldosa (relativa a la sala) un mueble que no se pisa? */
+function occupied(room: Room, x: number, y: number): boolean {
+  return room.furniture.some((f) => {
+    const def = FURNITURE[f.kind];
+    if (!def || def.walkable || def.wall || def.onTop) return false;
+    const fp = footprint(f.kind, f.flip);
+    return x >= f.x && x < f.x + fp.w && y >= f.y && y < f.y + fp.d;
+  });
+}
+
+/**
+ * Parada del primer ascensor de un edificio: la primera baldosa libre delante
+ * de sus puertas (sin girar, las puertas miran al sur; girado, al este).
+ */
+export function elevatorStop(rooms: Room[], building: string): ElevatorStop | null {
+  for (const room of rooms) {
+    if (buildingOf(room) !== building) continue;
+    for (const f of room.furniture) {
+      if (f.kind !== ELEVATOR_KIND) continue;
+      const free = entranceTiles(f).find((p) => p.x >= 0 && p.y >= 0 && p.x < room.w && p.y < room.d && !occupied(room, p.x, p.y));
+      if (free) return { x: room.x + free.x, y: room.y + free.y, roomId: room.id, building };
+    }
+  }
+  return null;
+}
+
+/** Ascensores que unen cada edificio con la casa de Orden (si ambos tienen uno). */
+export function computeElevators(rooms: Room[]): ElevatorLink[] {
+  const order = buildingOrder(rooms);
+  if (order.length < 2) return [];
+  const base = elevatorStop(rooms, order[0]);
+  if (!base) return [];
+  const out: ElevatorLink[] = [];
+  for (const b of order.slice(1)) {
+    const stop = elevatorStop(rooms, b);
+    if (stop) out.push({ id: `ascensor:${b}`, stops: [base, stop] });
+  }
+  return out;
+}
+
 /**
  * Pasarelas que unen cada edificio con el primero (la casa de Orden): la más
  * corta entre dos salas enfrentadas, alineada con sus puertas centrales y sin
- * atravesar ninguna sala.
+ * atravesar ninguna sala. Los edificios unidos por ascensor no llevan pasarela.
  */
 export function computeWalkways(rooms: Room[]): Walkway[] {
-  const order: string[] = [];
-  for (const r of rooms) if (!order.includes(buildingOf(r))) order.push(buildingOf(r));
+  const order = buildingOrder(rooms);
   if (order.length < 2) return [];
   const base = rooms.filter((r) => buildingOf(r) === order[0]);
+  const byElevator = new Set(computeElevators(rooms).map((l) => l.stops[1].building));
   const out: Walkway[] = [];
   for (const b of order.slice(1)) {
+    if (byElevator.has(b)) continue;
     let best: Walkway | null = null;
     const id = `pasarela:${b}`;
     const consider = (cand: Walkway) => {
@@ -198,11 +266,13 @@ export interface NavGrid {
   roomIds: string[];
   doors: Door[];
   walkways: Walkway[];
+  /** Ascensores entre edificios (saltos entre dos baldosas lejanas). */
+  elevators: ElevatorLink[];
 }
 
 export function buildNavGrid(rooms: Room[]): NavGrid {
   if (rooms.length === 0) {
-    return { minX: 0, minY: 0, width: 0, height: 0, room: new Int16Array(0), blocked: new Uint8Array(0), roomIds: [], doors: [], walkways: [] };
+    return { minX: 0, minY: 0, width: 0, height: 0, room: new Int16Array(0), blocked: new Uint8Array(0), roomIds: [], doors: [], walkways: [], elevators: [] };
   }
   const walkways = computeWalkways(rooms);
   const areas: Area[] = [...rooms, ...walkways];
@@ -241,7 +311,27 @@ export function buildNavGrid(rooms: Room[]): NavGrid {
     roomIds: [...rooms.map((r) => r.id), ...walkways.map((w) => w.id)],
     doors: [...computeDoors(rooms), ...walkways.flatMap(walkwayDoors)],
     walkways,
+    elevators: computeElevators(rooms),
   };
+}
+
+/** Coste de un viaje en ascensor (en pasos): lo bastante para no usarlo de atajo dentro de un edificio. */
+const ELEVATOR_COST = 4;
+
+/** Paradas a las que se llega en ascensor desde esta baldosa. */
+function elevatorExits(g: NavGrid, x: number, y: number): Point[] {
+  const out: Point[] = [];
+  for (const l of g.elevators ?? []) {
+    const [a, b] = l.stops;
+    if (a.x === x && a.y === y) out.push(b);
+    else if (b.x === x && b.y === y) out.push(a);
+  }
+  return out;
+}
+
+/** Punto de un camino; `elevator` = se llega a él en ascensor (salto, no se camina). */
+export interface PathPoint extends Point {
+  elevator?: boolean;
 }
 
 function idx(g: NavGrid, x: number, y: number) {
@@ -292,21 +382,30 @@ const DIRS = [
 
 /**
  * A* en 8 direcciones sin cortar esquinas. `goal` puede estar ocupado
- * (p. ej. una silla): se permite como destino final.
+ * (p. ej. una silla): se permite como destino final. Entre edificios unidos
+ * por ascensor, el camino salta de una parada a la otra (punto con `elevator`).
  */
-export function findPath(g: NavGrid, start: Point, goal: Point): Point[] | null {
+export function findPath(g: NavGrid, start: Point, goal: Point): PathPoint[] | null {
   if (!inGrid(g, start.x, start.y) || !inGrid(g, goal.x, goal.y)) return null;
   if (start.x === goal.x && start.y === goal.y) return [start];
   const N = g.width * g.height;
   const gScore = new Float64Array(N).fill(Infinity);
   const came = new Int32Array(N).fill(-1);
+  const viaElevator = new Uint8Array(N);
   const closed = new Uint8Array(N);
   const open: { i: number; f: number }[] = [];
-  const h = (x: number, y: number) => {
-    const dx = Math.abs(x - goal.x);
-    const dy = Math.abs(y - goal.y);
+  const octile = (x: number, y: number, to: Point) => {
+    const dx = Math.abs(x - to.x);
+    const dy = Math.abs(y - to.y);
     return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
   };
+  // Heurística admisible también con ascensores: el mínimo entre ir directo o pasar por uno.
+  const jumps = (g.elevators ?? []).flatMap((l) => [
+    [l.stops[0], l.stops[1]],
+    [l.stops[1], l.stops[0]],
+  ]);
+  const h = (x: number, y: number) =>
+    Math.min(octile(x, y, goal), ...jumps.map(([from, to]) => octile(x, y, from) + ELEVATOR_COST + octile(to.x, to.y, goal)));
   const si = idx(g, start.x, start.y);
   gScore[si] = 0;
   open.push({ i: si, f: h(start.x, start.y) });
@@ -340,14 +439,29 @@ export function findPath(g: NavGrid, start: Point, goal: Point): Point[] | null 
       if (cost < gScore[ni]) {
         gScore[ni] = cost;
         came[ni] = i;
+        viaElevator[ni] = 0;
         open.push({ i: ni, f: cost + h(nx, ny) });
+      }
+    }
+    for (const exit of elevatorExits(g, cx, cy)) {
+      if (!isFree(g, exit.x, exit.y, goal)) continue;
+      const ni = idx(g, exit.x, exit.y);
+      if (closed[ni]) continue;
+      const cost = gScore[i] + ELEVATOR_COST;
+      if (cost < gScore[ni]) {
+        gScore[ni] = cost;
+        came[ni] = i;
+        viaElevator[ni] = 1;
+        open.push({ i: ni, f: cost + h(exit.x, exit.y) });
       }
     }
   }
   if (came[gi] < 0) return null;
-  const path: Point[] = [];
+  const path: PathPoint[] = [];
   for (let i = gi; i >= 0; i = came[i]) {
-    path.push({ x: (i % g.width) + g.minX, y: Math.floor(i / g.width) + g.minY });
+    const p: PathPoint = { x: (i % g.width) + g.minX, y: Math.floor(i / g.width) + g.minY };
+    if (viaElevator[i]) p.elevator = true;
+    path.push(p);
     if (i === si) break;
   }
   return path.reverse();

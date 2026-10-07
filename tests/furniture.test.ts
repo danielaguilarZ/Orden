@@ -23,6 +23,7 @@ const MODERNOS = [
   "lampara_arco",
   "estanteria_moderna",
   "alfombra_moderna",
+  "ascensor",
 ];
 
 describe("catálogo de muebles", () => {

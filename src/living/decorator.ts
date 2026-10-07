@@ -9,7 +9,7 @@
  * Es determinista (semilla = id de la sala) para que no cambie al recargar.
  */
 
-import { FURNITURE, footprint } from "./furniture";
+import { entranceTiles, FURNITURE, footprint } from "./furniture";
 import type { FurnitureItem } from "../lib/types";
 
 export interface DecorContext {
@@ -105,6 +105,8 @@ class Layout {
         else this.blocked[this.idx(x, y)] = true;
       }
     if (def.seat) this.seats.push([it.x, it.y]);
+    // La entrada (de un ascensor) queda libre, como un paso de puerta.
+    for (const p of entranceTiles(it)) this.door.add(`${p.x},${p.y}`);
   }
 
   fits(x: number, y: number, fw: number, fd: number, walkable: boolean) {
@@ -236,6 +238,13 @@ function placeFloor(L: Layout, kind: string, rand: () => number): FurnitureItem 
         if (!L.fits(x, y, fp.w, fp.d, Boolean(def.walkable))) continue;
         let score = rand() * 0.8;
         const back = x === 0 || y === 0;
+        if (def.entrance) {
+          // De espaldas al muro y con la entrada dentro de la sala y sin tapar.
+          const facing = flip ? x === 0 : y === 0;
+          const front = entranceTiles({ kind, x, y, flip });
+          if (!facing || front.some((p) => p.x >= w || p.y >= d || !L.fits(p.x, p.y, 1, 1, false))) continue;
+          score += 6;
+        }
         // Frente hacia la sala: en la pared oeste sin espejar, en la norte espejado.
         if (x === 0 && !flip) score += 2;
         if (y === 0 && flip) score += 2;

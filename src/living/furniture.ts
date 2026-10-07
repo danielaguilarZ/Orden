@@ -40,6 +40,11 @@ export interface FurnitureDef {
   onTop?: boolean;
   /** Mueble alto: el decorador lo arrima a las paredes del fondo. */
   tall?: boolean;
+  /**
+   * Se entra por delante (ascensor): sin girar, por el sur; girado, por el
+   * este. El decorador lo pone de espaldas al muro y deja libre esa franja.
+   */
+  entrance?: boolean;
   /** Colores por defecto de las claves de tinte. */
   tints?: Record<string, string>;
   boxes: Box[];
@@ -938,6 +943,32 @@ Object.assign(FURNITURE, {
       { x: 1, y: 21, z: 31.5, w: 5, d: 6, h: 5, c: "#e9e8e4" },
     ],
   },
+  ascensor: {
+    // Puertas de acero contra el muro del fondo; se entra por la baldosa de
+    // delante (sin girar, al sur; girado, al este). Une plantas/edificios.
+    label: "Ascensor",
+    w: 2,
+    d: 1,
+    tall: true,
+    entrance: true,
+    tints: { $marco: "#2a2e35", $puerta: "#b9c0c8" },
+    boxes: [
+      { x: 0, y: 0, z: 0, w: 32, d: 4, h: 46, c: "$marco" },
+      { x: 2, y: 4, z: 0, w: 2, d: 2, h: 40, c: "$marco" },
+      { x: 28, y: 4, z: 0, w: 2, d: 2, h: 40, c: "$marco" },
+      { x: 2, y: 4, z: 36, w: 28, d: 2, h: 4, c: "$marco" },
+      { x: 4, y: 4, z: 0, w: 11.8, d: 1, h: 36, c: "$puerta" },
+      { x: 16.2, y: 4, z: 0, w: 11.8, d: 1, h: 36, c: "$puerta" },
+      { x: 15.8, y: 4.6, z: 0, w: 0.4, d: 0.6, h: 36, c: "#6b7480" },
+      { x: 2, y: 4, z: 0, w: 28, d: 7, h: 0.3, c: "#8a929c" },
+      { x: 11, y: 6, z: 41, w: 10, d: 0.4, h: 3.5, c: "#111317" },
+      { x: 12.5, y: 6.4, z: 42, w: 3, d: 0.2, h: 1.5, c: AMBAR },
+      { x: 17, y: 6.4, z: 42, w: 2, d: 0.2, h: 1.5, c: VERDE_UP },
+      { x: 30.2, y: 4, z: 15, w: 1.6, d: 1.2, h: 7, c: "#111317" },
+      { x: 30.6, y: 5.2, z: 19, w: 0.8, d: 0.3, h: 1.2, c: "#7fe8ff" },
+      { x: 30.6, y: 5.2, z: 16.5, w: 0.8, d: 0.3, h: 1.2, c: "#7fe8ff" },
+    ],
+  },
   alfombra_moderna: {
     label: "Alfombra moderna",
     w: 3,
@@ -962,6 +993,15 @@ export function footprint(kind: string, flip?: boolean): { w: number; d: number 
   const def = FURNITURE[kind];
   if (!def) return { w: 1, d: 1 };
   return flip ? { w: def.d, d: def.w } : { w: def.w, d: def.d };
+}
+
+/** Baldosas (relativas a la sala) por las que se entra a un mueble con `entrance`: la franja de delante. */
+export function entranceTiles(it: { kind: string; x: number; y: number; flip?: boolean }): { x: number; y: number }[] {
+  if (!FURNITURE[it.kind]?.entrance) return [];
+  const fp = footprint(it.kind, it.flip);
+  return it.flip
+    ? Array.from({ length: fp.d }, (_, j) => ({ x: it.x + fp.w, y: it.y + j }))
+    : Array.from({ length: fp.w }, (_, i) => ({ x: it.x + i, y: it.y + fp.d }));
 }
 
 /** Cajas listas para pintar: tintes resueltos y espejado aplicado. */

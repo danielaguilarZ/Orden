@@ -27,8 +27,10 @@ export interface RoomTemplate {
  * la casa de Orden; otro edificio = otra entrada aquí y plantillas con su
  * `building` (se une a la casa con una pasarela acristalada).
  */
-export const BUILDINGS: Record<string, { label: string; fallback: string }> = {
+export const BUILDINGS: Record<string, { label: string; fallback: string; ascensor?: boolean }> = {
   orden: { label: "Casa de Orden", fallback: "estudio" },
+  // Planta de marketing: se sube en ascensor (con uno aquí y otro en la casa no lleva pasarela).
+  marketing: { label: "Planta de marketing", fallback: "marketing_abierta", ascensor: true },
 };
 
 export const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
@@ -171,6 +173,35 @@ export const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
     keywords: ["hogar", "casa", "limpieza", "mantenimiento", "planta", "jardin", "mascota", "familia", "ocio", "pelicula", "serie"],
     style: { floor: "moqueta", floorA: "#a9746e", floorB: "#9f6b65", wall: "#f2e6dc", wallTrim: "#7b4b3a" },
     kinds: ["sofa", "tele", "mesita", "alfombra", "ventana", "cuadro", "planta", "planta", "lampara"],
+  },
+
+  // ───────────── Planta de marketing (edificio aparte, se sube en ascensor) ─────────────
+  marketing_recepcion: {
+    kind: "marketing_recepcion",
+    label: "Recepción de marketing",
+    keywords: ["recepcion", "vestibulo", "ascensor", "entrada", "hall"],
+    building: "marketing",
+    style: { floor: "hormigón", floorA: "#d9d6cf", floorB: "#cfccc4", wall: "#dfe6df", wallTrim: "#2f4a3a" },
+    kinds: ["ascensor", "sofa_modular", "mesa_centro", "alfombra_moderna", "videowall", "neon", "arte_abstracto", "planta_moderna", "planta_moderna", "lampara_arco", "cafetera"],
+    tints: { neon: { $luz: "#ff4fd8" }, cafetera: { $mueble: "#f3f3f0", $maquina: "#2b2f36" } },
+  },
+  despacho_marketing: {
+    kind: "despacho_marketing",
+    label: "Despacho de marketing",
+    keywords: ["despacho", "redes", "social", "copy", "contenido", "seo", "marca", "anuncio", "campana", "community", "comunicacion", "influencer"],
+    building: "marketing",
+    style: { floor: "madera", floorA: "#dcc39c", floorB: "#d2b88f", wall: "#f7f7f5", wallTrim: "#3a3f45" },
+    kinds: ["puesto_moderno", "monitor_doble", "portatil", "ventana", "arte_abstracto", "panel_listones", "estanteria_moderna", "planta_moderna", "lampara_arco", "alfombra_moderna"],
+    tints: { ventana: { $marco: "#2a2e35" } },
+  },
+  marketing_abierta: {
+    kind: "marketing_abierta",
+    label: "Sala creativa",
+    keywords: ["reunion", "creativ", "brainstorm", "abierta", "coworking", "marketing"],
+    building: "marketing",
+    style: { floor: "mármol", floorA: "#ecebe7", floorB: "#dcdbd6", wall: "#cfd3d8", wallTrim: "#2a2e35" },
+    kinds: ["mesa_comedor", "silla_ergonomica", "silla_ergonomica", "corcho", "videowall", "pizarra", "estanteria_moderna", "planta_moderna", "planta_moderna", "cafetera", "neon"],
+    tints: { mesa_comedor: { $madera: "#f3f3f0" }, neon: { $luz: "#ff4fd8" }, cafetera: { $mueble: "#f3f3f0", $maquina: "#2b2f36" } },
   },
 };
 

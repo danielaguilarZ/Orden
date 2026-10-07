@@ -14,7 +14,7 @@ import { untilText, type ClaudeUsage } from "../lib/claude/usageText";
 import { getPersonality } from "../lib/personalities";
 import { AVATAR_W, FOOT_X, FOOT_Y, SEAT_Y, POSES, appearanceKey, drawAvatar, type Pose, type View } from "./avatar";
 import { FURNITURE, footprint, resolveBoxes } from "./furniture";
-import { buildNavGrid, canStep, findPath, freeTilesInRoom, isFree, roomIndexAt, type NavGrid, type Point } from "./house";
+import { buildNavGrid, canStep, findPath, freeTilesInRoom, isFree, roomIndexAt, type NavGrid, type PathPoint, type Point } from "./house";
 import { currentRoom, isNearDesk, pickSeat } from "./presence";
 import { dividerPieces, exteriorPieces, outerWallSides, renderBackground, T } from "./houseRender";
 import { project, rasterizeBoxes, type PixelImage } from "./raster";
@@ -134,7 +134,9 @@ function tileDiamond(tx: number, ty: number): number[] {
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
-const pick = <T>(arr: T[]): T | undefined => (arr.length ? arr[Math.floor(Math.random() * arr.length)] : undefined);
+/** Lo que tarda un viaje en ascensor entre plantas. */
+const ELEVATOR_RIDE_MS = 1600;
+const pick =<T>(arr: T[]): T | undefined => (arr.length ? arr[Math.floor(Math.random() * arr.length)] : undefined);
 
 class Actor {
   agent: Agent;
@@ -145,7 +147,9 @@ class Actor {
   nameEl: HTMLDivElement;
   pos: Point = { x: 0.5, y: 0.5 };
   z = 0;
-  path: Point[] = [];
+  path: PathPoint[] = [];
+  /** Viaje en ascensor en curso: hasta cuándo va dentro (oculto). */
+  rideUntil = 0;
   mode: "stand" | "walk" | "sit" = "stand";
   seat: Seat | null = null;
   mirror = false;
@@ -795,6 +799,7 @@ export class LivingScene {
     if (!room) return;
     const tile = pick(freeTilesInRoom(this.grid, room)) ?? { x: room.x, y: room.y };
     actor.pos = { x: tile.x + 0.5, y: tile.y + 0.5 };
+    actor.rideUntil = 0;
     actor.placed = true;
   }
 
@@ -839,7 +844,8 @@ export class LivingScene {
     if (!path) return false;
     actor.seat = null;
     actor.z = 0;
-    actor.path = path.slice(1).map((p) => ({ x: p.x + 0.5, y: p.y + 0.5 }));
+    actor.rideUntil = 0;
+    actor.path = path.slice(1).map((p) => ({ x: p.x + 0.5, y: p.y + 0.5, ...(p.elevator && { elevator: true }) }));
     actor.mode = actor.path.length ? "walk" : "stand";
     actor.onArrive = onArrive ?? null;
     if (!actor.path.length) onArrive?.();
@@ -919,7 +925,16 @@ export class LivingScene {
     for (const actor of this.actors.values()) {
       if (!actor.placed) this.place(actor);
       // Movimiento
-      if (actor.mode === "walk" && actor.path.length) {
+      if (actor.mode === "walk" && actor.path.length && actor.path[0].elevator) {
+        // Ascensor: entra (desaparece), sube o baja y sale por la otra parada.
+        const target = actor.path[0];
+        if (!actor.rideUntil) actor.rideUntil = now + ELEVATOR_RIDE_MS;
+        else if (now >= actor.rideUntil) {
+          actor.rideUntil = 0;
+          actor.pos = { x: target.x, y: target.y };
+          actor.path[0] = { x: target.x, y: target.y };
+        }
+      } else if (actor.mode === "walk" && actor.path.length) {
         const target = actor.path[0];
         const dx = target.x - actor.pos.x;
         const dy = target.y - actor.pos.y;
@@ -978,6 +993,9 @@ export class LivingScene {
       actor.sprite.scale.x = actor.mirror ? -1 : 1;
       const p = project(actor.pos.x * T, actor.pos.y * T, actor.z);
       actor.sprite.position.set(Math.round(p.sx), Math.round(p.sy));
+      const riding = actor.rideUntil > 0;
+      actor.sprite.visible = actor.placed && !riding;
+      actor.el.style.visibility = riding ? "hidden" : "";
       actor.sprite.zIndex = actor.mode === "sit" && actor.seat ? actor.seat.depth + 0.05 : actor.pos.x + actor.pos.y + 0.02;
 
       // Capa HTML (nombre, estado, bocadillo) sobre la cabeza

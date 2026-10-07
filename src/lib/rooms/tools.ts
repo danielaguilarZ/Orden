@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { defineTool, fail, ok, registerTools } from "../agents/tools";
 import { registerPromptSection } from "../agents/prompt";
-import { getAgent, listAgents, setAgentLocation } from "../repo/agents";
+import { findAgentByName, getAgent, listAgents, setAgentLocation } from "../repo/agents";
 import { listRooms, updateRoom } from "../repo/rooms";
-import { buildRoom, describeRooms, moveFurniture, placeFurnitureAt, redecorateRoom, setRoomFinish, type PlaceResult } from "../rooms";
+import { assignOwnRoom, buildRoom, describeRooms, moveFurniture, placeFurnitureAt, redecorateRoom, setRoomFinish, type PlaceResult } from "../rooms";
 import { describeRoomLayout, itemName, shortIds } from "../../living/roomMap";
 import { roomContext } from "../../living/roomEditor";
 import { FURNITURE } from "../../living/furniture";
@@ -11,6 +11,10 @@ import { describeFinishes, FLOOR_FINISHES, WALL_FINISHES } from "../../living/fi
 import { DESK_SETS } from "../../living/decorator";
 import { currentRoom, findRoomByRef } from "../../living/presence";
 import { BUILDINGS } from "../roomTemplates";
+
+const BUILDING_LIST = Object.entries(BUILDINGS)
+  .map(([id, b]) => `${id} (${b.label.toLowerCase()}${b.ascensor ? ", se sube en ascensor: lleva un «ascensor» y la casa necesita otro" : ""})`)
+  .join(", ");
 
 const CATALOG = Object.entries(FURNITURE)
   .map(([k, d]) => `${k} (${d.label.toLowerCase()})`)
@@ -189,15 +193,40 @@ registerTools((ctx) => {
     ),
     defineTool(
       "sala_crear",
-      "Crea una sala común para un ámbito nuevo (sin dueño) en la casa de Orden. Se amuebla sola según el ámbito.",
+      `Crea una sala común para un ámbito nuevo (sin dueño). Se amuebla sola según el ámbito. Sin edificio, va a la casa de Orden; edificios: ${BUILDING_LIST}. Las salas de un mismo edificio se juntan y se comunican por puertas (varias forman una oficina grande).`,
       {
         nombre: z.string(),
-        ambito: z.string().describe("p. ej. «cocina y recetas», «viajes», «salud», «diseño web»"),
+        ambito: z.string().describe("p. ej. «cocina y recetas», «viajes», «salud», «diseño web», «despacho de redes sociales»"),
+        edificio: z.string().optional().describe("Id del edificio (por defecto, orden)"),
       },
-      async ({ nombre, ambito }) => {
-        const room = buildRoom({ name: nombre, domain: `${ambito} ${nombre}` });
+      async ({ nombre, ambito, edificio }) => {
+        const building = edificio?.trim() || undefined;
+        if (building && !BUILDINGS[building]) return fail(`No conozco el edificio «${building}». Edificios: ${BUILDING_LIST}.`);
+        const room = buildRoom({ name: nombre, domain: `${ambito} ${nombre}`, building });
         ctx.note(`Ha creado la sala «${room.name}»`, { kind: "room", roomId: room.id });
         return ok(`Sala «${room.name}» creada (${room.kind}, ${BUILDINGS[room.building ?? "orden"]?.label ?? room.building}).`);
+      },
+    ),
+    defineTool(
+      "sala_asignar",
+      "Hace de una sala el despacho propio de un agente (solo el jefe): pasa a ser su dueño, se le asigna un puesto libre de esa sala y su escritorio anterior queda libre. La sala necesita un puesto (silla junto a un escritorio) sin asignar.",
+      {
+        sala: z.string().describe("Nombre de la sala"),
+        agente: z.string().describe("Nombre del agente"),
+      },
+      async ({ sala, agente }) => {
+        if (!ctx.agent.isChief) return fail("Solo el jefe puede asignar despachos.");
+        const room = findRoomByRef(listRooms(), sala);
+        if (!room) return notFound(sala);
+        const agent = findAgentByName(agente.trim());
+        if (!agent) return fail(`No encuentro a ${agente}. Equipo: ${listAgents().map((a) => a.name).join(", ")}.`);
+        try {
+          const r = assignOwnRoom(room.id, agent.id);
+          ctx.note(`«${r.room.name}» es ahora el despacho de ${agent.name}`, { kind: "room", roomId: r.room.id });
+          return ok(`«${r.room.name}» es ahora el despacho de ${agent.name}.`);
+        } catch (e) {
+          return fail((e as Error).message);
+        }
       },
     ),
   ];
