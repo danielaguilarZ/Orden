@@ -655,6 +655,304 @@ Object.assign(FURNITURE, {
   },
 } satisfies Record<string, FurnitureDef>);
 
+// ───────────── Muebles modernos ─────────────
+// Líneas finas, blanco y negro mate, roble claro y pantallas: para oficinas
+// y salas con aire contemporáneo (sala de trading, estudio, salón actual).
+
+const NEGRO = "#1f2226";
+const MALLA = "#2b2f36";
+const LATON = "#c9a227";
+const VERDE_UP = "#5ccf8a";
+const ROJO_DOWN = "#ef5b5b";
+const AMBAR = "#f0b84a";
+const AZUL_DATO = "#6ba8ef";
+
+/** Barras verticales de un gráfico pintadas sobre una pantalla que mira a +x. */
+function bars(x: number, y0: number, z: number, heights: number[], step = 2.5): Box[] {
+  return heights.map((h, i) => ({ x, y: y0 + i * step, z, w: 0.2, d: 1.4, h: Math.abs(h), c: h >= 0 ? VERDE_UP : ROJO_DOWN }));
+}
+
+/** Escalones de una línea de cotización sobre una pantalla de pared (y = 0). */
+function stepLine(x0: number, y: number, z0: number, deltas: number[], c: string): Box[] {
+  let z = z0;
+  return deltas.map((dz, i) => {
+    z += dz;
+    return { x: x0 + i * 2.5, y, z, w: 2.6, d: 0.3, h: 0.9, c };
+  });
+}
+
+Object.assign(FURNITURE, {
+  escritorio_moderno: {
+    label: "Escritorio moderno",
+    w: 2,
+    d: 1,
+    desk: true,
+    surface: 16,
+    tints: { $tablero: "#f3f3f0", $patas: NEGRO },
+    boxes: [
+      { x: 1, y: 1, z: 0, w: 2, d: 14, h: 1.5, c: "$patas" },
+      { x: 1, y: 1, z: 1.5, w: 2, d: 2, h: 12.5, c: "$patas" },
+      { x: 1, y: 13, z: 1.5, w: 2, d: 2, h: 12.5, c: "$patas" },
+      { x: 29, y: 1, z: 0, w: 2, d: 14, h: 1.5, c: "$patas" },
+      { x: 29, y: 1, z: 1.5, w: 2, d: 2, h: 12.5, c: "$patas" },
+      { x: 29, y: 13, z: 1.5, w: 2, d: 2, h: 12.5, c: "$patas" },
+      { x: 3, y: 2, z: 12, w: 26, d: 1, h: 2, c: "$patas" },
+      { x: 0, y: 0.5, z: 14, w: 32, d: 15, h: 2, c: "$tablero" },
+    ],
+  },
+  silla_ergonomica: {
+    label: "Silla ergonómica",
+    w: 1,
+    d: 1,
+    seat: { face: "x", z: 10 },
+    tints: { $malla: MALLA, $base: "#9aa3ad" },
+    boxes: [
+      { x: 3, y: 7, z: 0, w: 10, d: 2, h: 1.5, c: "$base" },
+      { x: 7, y: 3, z: 0, w: 2, d: 10, h: 1.5, c: "$base" },
+      { x: 7, y: 7, z: 1.5, w: 2, d: 2, h: 7, c: "$base" },
+      { x: 3, y: 3, z: 8.5, w: 10, d: 10, h: 2.5, c: "$malla" },
+      { x: 5, y: 2.5, z: 11, w: 1, d: 1, h: 3, c: NEGRO },
+      { x: 5, y: 12.5, z: 11, w: 1, d: 1, h: 3, c: NEGRO },
+      { x: 4.5, y: 2.5, z: 14, w: 6, d: 1, h: 1, c: NEGRO },
+      { x: 4.5, y: 12.5, z: 14, w: 6, d: 1, h: 1, c: NEGRO },
+      { x: 2, y: 3.5, z: 11, w: 2, d: 9, h: 13, c: "$malla" },
+      { x: 2, y: 5, z: 24, w: 2, d: 6, h: 3, c: "$malla" },
+    ],
+  },
+  sofa_modular: {
+    label: "Sofá modular",
+    w: 1,
+    d: 2,
+    tall: true,
+    seat: { face: "x", z: 9 },
+    tints: { $tela: "#9ea3a8", $cojin: "#b3b8bd", $acento: "#e0a458" },
+    boxes: [
+      { x: 2, y: 2, z: 0, w: 2, d: 2, h: 2, c: NEGRO },
+      { x: 12, y: 2, z: 0, w: 2, d: 2, h: 2, c: NEGRO },
+      { x: 2, y: 28, z: 0, w: 2, d: 2, h: 2, c: NEGRO },
+      { x: 12, y: 28, z: 0, w: 2, d: 2, h: 2, c: NEGRO },
+      { x: 1, y: 1, z: 2, w: 14, d: 30, h: 5, c: "$tela" },
+      { x: 1, y: 1, z: 7, w: 4, d: 30, h: 9, c: "$tela" },
+      { x: 5, y: 1, z: 7, w: 10, d: 2, h: 4, c: "$tela" },
+      { x: 5, y: 29, z: 7, w: 10, d: 2, h: 4, c: "$tela" },
+      { x: 5, y: 3, z: 7, w: 10, d: 12.8, h: 2, c: "$cojin" },
+      { x: 5, y: 16.2, z: 7, w: 10, d: 12.8, h: 2, c: "$cojin" },
+      { x: 5, y: 4, z: 9, w: 2, d: 5, h: 5, c: "$acento" },
+    ],
+  },
+  mesa_centro: {
+    label: "Mesa de centro",
+    w: 2,
+    d: 1,
+    desk: true,
+    surface: 8,
+    tints: { $tablero: "#d9c3a0", $patas: NEGRO },
+    boxes: [
+      { x: 3, y: 2, z: 0, w: 1.5, d: 1.5, h: 6, c: "$patas" },
+      { x: 27.5, y: 2, z: 0, w: 1.5, d: 1.5, h: 6, c: "$patas" },
+      { x: 3, y: 12.5, z: 0, w: 1.5, d: 1.5, h: 6, c: "$patas" },
+      { x: 27.5, y: 12.5, z: 0, w: 1.5, d: 1.5, h: 6, c: "$patas" },
+      { x: 3, y: 3, z: 2, w: 26, d: 10, h: 1, c: "$patas" },
+      { x: 1, y: 1, z: 6, w: 30, d: 14, h: 2, c: "$tablero" },
+    ],
+  },
+  monitor_doble: {
+    onTop: true,
+    label: "Monitor doble",
+    w: 1,
+    d: 1,
+    tints: { $marco: "#16181c", $pantalla: "#1d2f45" },
+    boxes: [
+      { x: 3, y: 6, z: 0, w: 4, d: 4, h: 1, c: "$marco" },
+      { x: 4.5, y: 7.5, z: 1, w: 1, d: 1, h: 5, c: "$marco" },
+      { x: 5, y: 0.5, z: 5, w: 1, d: 7.3, h: 7, c: "$marco" },
+      { x: 6, y: 1, z: 5.5, w: 0.4, d: 6.3, h: 6, c: "$pantalla" },
+      { x: 5, y: 8.2, z: 5, w: 1, d: 7.3, h: 7, c: "$marco" },
+      { x: 6, y: 8.7, z: 5.5, w: 0.4, d: 6.3, h: 6, c: "$pantalla" },
+      { x: 6.4, y: 1.8, z: 7, w: 0.2, d: 2, h: 0.6, c: VERDE_UP },
+      { x: 6.4, y: 3.5, z: 8.2, w: 0.2, d: 2, h: 0.6, c: VERDE_UP },
+      { x: 6.4, y: 5.2, z: 9.6, w: 0.2, d: 1.6, h: 0.6, c: VERDE_UP },
+      ...bars(6.4, 9.3, 6.2, [3, -2, 4, -1.5], 1.5),
+      { x: 9, y: 3, z: 0, w: 4, d: 10, h: 0.8, c: "#2a2d33" },
+      { x: 9.5, y: 13.5, z: 0, w: 2.5, d: 1.8, h: 0.8, c: "#2a2d33" },
+    ],
+  },
+  portatil: {
+    onTop: true,
+    label: "Portátil",
+    w: 1,
+    d: 1,
+    tints: { $carcasa: "#c7ccd1", $pantalla: "#3b6ea8" },
+    boxes: [
+      { x: 5, y: 3, z: 0, w: 7, d: 10, h: 0.8, c: "$carcasa" },
+      { x: 4, y: 3, z: 0.8, w: 1, d: 10, h: 7, c: "$carcasa" },
+      { x: 5, y: 3.5, z: 1.5, w: 0.3, d: 9, h: 5.5, c: "$pantalla" },
+      { x: 6.5, y: 4, z: 0.8, w: 4, d: 8, h: 0.1, c: "#3a3f47" },
+    ],
+  },
+  videowall: {
+    label: "Videowall",
+    w: 2,
+    d: 1,
+    wall: true,
+    tints: { $marco: "#111317", $pantalla: "#14243a" },
+    boxes: [
+      { x: 1, y: 0, z: 12, w: 30, d: 1.5, h: 34, c: "$marco" },
+      { x: 1.5, y: 1.5, z: 12.5, w: 14.25, d: 0.4, h: 16.25, c: "$pantalla" },
+      { x: 16.25, y: 1.5, z: 12.5, w: 14.25, d: 0.4, h: 16.25, c: "$pantalla" },
+      { x: 1.5, y: 1.5, z: 29.25, w: 14.25, d: 0.4, h: 16.25, c: "$pantalla" },
+      { x: 16.25, y: 1.5, z: 29.25, w: 14.25, d: 0.4, h: 16.25, c: "$pantalla" },
+      // Arriba a la izquierda: cifra grande y variación.
+      { x: 3, y: 1.9, z: 40, w: 9, d: 0.3, h: 3, c: "#e9f1fb" },
+      { x: 3, y: 1.9, z: 35.5, w: 5, d: 0.3, h: 2, c: VERDE_UP },
+      { x: 3, y: 1.9, z: 31.5, w: 11, d: 0.3, h: 1, c: "#2c4566" },
+      // Arriba a la derecha: velas.
+      ...[
+        [18, 33, 6, VERDE_UP],
+        [20.5, 35, 5, ROJO_DOWN],
+        [23, 32, 8, VERDE_UP],
+        [25.5, 36, 4, ROJO_DOWN],
+        [28, 34, 8, VERDE_UP],
+      ].map(([x, z, h, c]) => ({ x: x as number, y: 1.9, z: z as number, w: 1.2, d: 0.3, h: h as number, c: c as string })),
+      // Abajo a la izquierda: línea de cotización.
+      ...stepLine(2.5, 1.9, 14, [1, 2, -1, 3, 1, 2], VERDE_UP),
+      // Abajo a la derecha: ranking de barras.
+      { x: 18, y: 1.9, z: 24.5, w: 10, d: 0.3, h: 1, c: AMBAR },
+      { x: 18, y: 1.9, z: 21.5, w: 7, d: 0.3, h: 1, c: AZUL_DATO },
+      { x: 18, y: 1.9, z: 18.5, w: 9, d: 0.3, h: 1, c: VERDE_UP },
+      { x: 18, y: 1.9, z: 15.5, w: 5, d: 0.3, h: 1, c: ROJO_DOWN },
+    ],
+  },
+  pantalla_led: {
+    label: "Pantalla LED",
+    w: 1,
+    d: 2,
+    tall: true,
+    tints: { $marco: "#111317", $pantalla: "#14243a" },
+    boxes: [
+      { x: 3, y: 4, z: 0, w: 8, d: 2, h: 1, c: NEGRO },
+      { x: 3, y: 26, z: 0, w: 8, d: 2, h: 1, c: NEGRO },
+      { x: 6, y: 4.5, z: 1, w: 1.5, d: 1, h: 12, c: NEGRO },
+      { x: 6, y: 26.5, z: 1, w: 1.5, d: 1, h: 12, c: NEGRO },
+      { x: 5.5, y: 1, z: 12, w: 2, d: 30, h: 24, c: "$marco" },
+      { x: 7.5, y: 1.7, z: 12.7, w: 0.4, d: 28.6, h: 22.6, c: "$pantalla" },
+      { x: 7.9, y: 2, z: 13.2, w: 0.2, d: 28, h: 1.5, c: "#0b1420" },
+      ...bars(7.9, 4, 15.5, [6, 9, -7, 12, 10, -5]),
+      { x: 7.9, y: 20, z: 30, w: 0.2, d: 9, h: 1, c: AMBAR },
+      { x: 7.9, y: 20, z: 27, w: 0.2, d: 6, h: 1, c: AZUL_DATO },
+      { x: 7.9, y: 20, z: 24, w: 0.2, d: 8, h: 1, c: VERDE_UP },
+      { x: 7.9, y: 20, z: 21, w: 0.2, d: 4, h: 1, c: ROJO_DOWN },
+    ],
+  },
+  panel_listones: {
+    label: "Panel de listones",
+    w: 2,
+    d: 1,
+    wall: true,
+    tints: { $madera: "#c99a66", $fondo: "#2b2a28" },
+    boxes: [
+      { x: 1, y: 0, z: 6, w: 30, d: 0.8, h: 40, c: "$fondo" },
+      ...Array.from({ length: 12 }, (_, i) => ({ x: 2 + i * 2.4, y: 0.8, z: 6, w: 1.4, d: 1, h: 40, c: "$madera" })),
+    ],
+  },
+  arte_abstracto: {
+    label: "Arte abstracto",
+    w: 2,
+    d: 1,
+    wall: true,
+    tints: { $lienzo: "#f4f1ea" },
+    boxes: [
+      { x: 3, y: 0, z: 22, w: 26, d: 1, h: 20, c: NEGRO },
+      { x: 3.5, y: 1, z: 22.5, w: 25, d: 0.4, h: 19, c: "$lienzo" },
+      { x: 5, y: 1.4, z: 28, w: 8, d: 0.2, h: 11, c: "#e07a5f" },
+      { x: 14, y: 1.4, z: 24, w: 7, d: 0.2, h: 7, c: "#3d405b" },
+      { x: 19, y: 1.4, z: 31, w: 7, d: 0.2, h: 8, c: "#81b29a" },
+      { x: 12, y: 1.4, z: 34, w: 4, d: 0.2, h: 4, c: "#f2cc8f" },
+    ],
+  },
+  neon: {
+    label: "Neón",
+    w: 1,
+    d: 1,
+    wall: true,
+    tints: { $luz: "#4ff0ff" },
+    boxes: [
+      // Una flecha de tendencia al alza en tubo de neón.
+      { x: 2, y: 0.5, z: 27, w: 3, d: 0.8, h: 1.2, c: "$luz" },
+      { x: 4, y: 0.5, z: 27, w: 1.2, d: 0.8, h: 4, c: "$luz" },
+      { x: 4, y: 0.5, z: 30.8, w: 3, d: 0.8, h: 1.2, c: "$luz" },
+      { x: 6.8, y: 0.5, z: 29, w: 1.2, d: 0.8, h: 3, c: "$luz" },
+      { x: 6.8, y: 0.5, z: 29, w: 3, d: 0.8, h: 1.2, c: "$luz" },
+      { x: 8.6, y: 0.5, z: 29, w: 1.2, d: 0.8, h: 7, c: "$luz" },
+      { x: 8.6, y: 0.5, z: 35.8, w: 4, d: 0.8, h: 1.2, c: "$luz" },
+      { x: 11, y: 0.5, z: 37, w: 3, d: 0.8, h: 1.2, c: "$luz" },
+      { x: 12.6, y: 0.5, z: 33.5, w: 1.2, d: 0.8, h: 4.7, c: "$luz" },
+    ],
+  },
+  planta_moderna: {
+    label: "Planta moderna",
+    w: 1,
+    d: 1,
+    tints: { $maceta: "#f1f1ee", $hoja: "#2f7d4a" },
+    boxes: [
+      { x: 4, y: 4, z: 0, w: 8, d: 8, h: 12, c: "$maceta" },
+      { x: 5, y: 5, z: 12, w: 6, d: 6, h: 0.5, c: "#3b2a20" },
+      { x: 7.5, y: 7.5, z: 12, w: 1, d: 1, h: 18, c: "#3f6b3a" },
+      { x: 3, y: 3, z: 18, w: 5, d: 4, h: 2, c: "$hoja" },
+      { x: 2, y: 7, z: 22, w: 7, d: 5, h: 2, c: "$hoja" },
+      { x: 8, y: 3, z: 26, w: 6, d: 6, h: 2, c: "$hoja" },
+      { x: 5, y: 9, z: 29, w: 6, d: 5, h: 2, c: "#3f9a5c" },
+      { x: 6, y: 4, z: 33, w: 5, d: 5, h: 2, c: "#3f9a5c" },
+    ],
+  },
+  lampara_arco: {
+    label: "Lámpara de arco",
+    w: 1,
+    d: 1,
+    tints: { $metal: LATON, $pantalla: NEGRO },
+    boxes: [
+      { x: 3, y: 3, z: 0, w: 8, d: 10, h: 3, c: "#e9e8e4" },
+      { x: 4, y: 7, z: 3, w: 1.5, d: 1.5, h: 38, c: "$metal" },
+      { x: 4, y: 7, z: 41, w: 10, d: 1.5, h: 1.5, c: "$metal" },
+      { x: 12.5, y: 7, z: 36, w: 1.5, d: 1.5, h: 5, c: "$metal" },
+      { x: 10, y: 4.75, z: 31, w: 6, d: 6, h: 5, c: "$pantalla", top: MALLA },
+      { x: 11.5, y: 6.25, z: 30.4, w: 3, d: 3, h: 0.6, c: "#fff3c4" },
+    ],
+  },
+  estanteria_moderna: {
+    label: "Estantería moderna",
+    w: 1,
+    d: 2,
+    tall: true,
+    tints: { $madera: "#d9c3a0", $metal: NEGRO },
+    boxes: [
+      { x: 0, y: 0, z: 0, w: 7, d: 1, h: 46, c: "$metal" },
+      { x: 0, y: 31, z: 0, w: 7, d: 1, h: 46, c: "$metal" },
+      ...[0, 15, 30, 44].map((z) => ({ x: 0, y: 0, z, w: 7, d: 32, h: 1.5, c: "$madera" })),
+      { x: 2, y: 4, z: 1.5, w: 3, d: 3, h: 7, c: "#e07a5f" },
+      { x: 1, y: 20, z: 1.5, w: 5, d: 7, h: 3, c: "#3d405b" },
+      ...books(1, 3, 16.5, 5, "y", [MALLA, "#e9e8e4", "#81b29a"]),
+      { x: 2, y: 24, z: 16.5, w: 3, d: 3, h: 3, c: LATON },
+      { x: 2, y: 6, z: 31.5, w: 3, d: 3, h: 3, c: "#f1f1ee" },
+      { x: 1.5, y: 5.5, z: 34.5, w: 4, d: 4, h: 4, c: "#3f9a5c" },
+      { x: 1, y: 21, z: 31.5, w: 5, d: 6, h: 5, c: "#e9e8e4" },
+    ],
+  },
+  alfombra_moderna: {
+    label: "Alfombra moderna",
+    w: 3,
+    d: 2,
+    walkable: true,
+    tints: { $base: "#d8d4cc" },
+    boxes: [
+      { x: 2, y: 2, z: 0, w: 44, d: 28, h: 1, c: "$base" },
+      { x: 6, y: 6, z: 1, w: 14, d: 20, h: 0.01, c: "#3d405b" },
+      { x: 20, y: 6, z: 1, w: 10, d: 10, h: 0.01, c: "#e07a5f" },
+      { x: 30, y: 16, z: 1, w: 12, d: 10, h: 0.01, c: "#81b29a" },
+    ],
+  },
+} satisfies Record<string, FurnitureDef>);
+
 for (const k of ["estanteria", "archivador", "cafetera", "sofa"]) FURNITURE[k].tall = true;
 
 export const TILE_UNITS = T;

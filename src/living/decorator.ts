@@ -200,6 +200,7 @@ function placeOnTop(L: Layout, kind: string): FurnitureItem | null {
 /** Puestos de trabajo: nombre → [silla, escritorio]. */
 export const DESK_SETS: Record<string, [string, string]> = {
   puesto: ["silla", "escritorio"],
+  puesto_moderno: ["silla_ergonomica", "escritorio_moderno"],
 };
 
 function placeDeskSet(L: Layout, rand: () => number, [chair, desk]: [string, string]): FurnitureItem[] | null {

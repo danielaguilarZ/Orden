@@ -93,7 +93,7 @@ registerTools((ctx) => {
     ),
     defineTool(
       "sala_decorar",
-      `Añade o quita muebles de cualquier sala (la tuya, la de otro agente o una común). Sin posición, los nuevos se colocan solos en un hueco libre sin mover los que ya hay; con x,y (y girado) o junto_a (id de otro mueble) se coloca UNO solo justo ahí, comprobando choques. «puesto» = silla + escritorio (con x,y: la silla en x,y y el escritorio a su derecha; girado, debajo). quitar admite tipos (quita uno) o ids concretos de sala_ver. Muebles: ${CATALOG}.`,
+      `Añade o quita muebles de cualquier sala (la tuya, la de otro agente o una común). Sin posición, los nuevos se colocan solos en un hueco libre sin mover los que ya hay; con x,y (y girado) o junto_a (id de otro mueble) se coloca UNO solo justo ahí, comprobando choques. «puesto» = silla + escritorio y «puesto_moderno» = silla ergonómica + escritorio moderno (con x,y: la silla en x,y y el escritorio a su derecha; girado, debajo). quitar admite tipos (quita uno) o ids concretos de sala_ver. Muebles: ${CATALOG}.`,
       {
         anadir: z.array(z.string()).optional(),
         quitar: z.array(z.string()).optional().describe("Tipos de mueble o ids (de sala_ver)"),

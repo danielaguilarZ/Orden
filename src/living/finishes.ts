@@ -47,6 +47,9 @@ export const FLOOR_FINISHES: FloorFinish[] = [
   { id: "moqueta_gris", label: "Moqueta gris", floor: "moqueta", floorA: "#9a9a9e", floorB: "#8f8f94" },
   { id: "tatami", label: "Tatami", floor: "tatami", floorA: "#c9c27d", floorB: "#bdb672" },
   { id: "hormigon", label: "Hormigón gris", floor: "hormigón", floorA: "#b5b5b0", floorB: "#a8a8a3" },
+  { id: "microcemento", label: "Microcemento claro", floor: "hormigón", floorA: "#d9d6cf", floorB: "#cfccc4" },
+  { id: "roble_nordico", label: "Roble nórdico", floor: "madera", floorA: "#dcc39c", floorB: "#d2b88f" },
+  { id: "porcelanico_negro", label: "Porcelánico negro", floor: "mármol", floorA: "#4a4d52", floorB: "#414449" },
 ];
 
 export const WALL_FINISHES: WallFinish[] = [
@@ -65,6 +68,9 @@ export const WALL_FINISHES: WallFinish[] = [
   { id: "biblioteca", label: "Marfil y caoba", wall: "#e9dfc9", wallTrim: "#4e3626" },
   { id: "ocre", label: "Ocre", wall: "#ece6d6", wallTrim: "#6d5d3f" },
   { id: "azul_noche", label: "Azul noche", wall: "#e8edf2", wallTrim: "#34495e" },
+  { id: "blanco_puro", label: "Blanco puro", wall: "#f7f7f5", wallTrim: "#3a3f45" },
+  { id: "grafito", label: "Grafito", wall: "#cfd3d8", wallTrim: "#2a2e35" },
+  { id: "verde_bosque", label: "Verde bosque", wall: "#dfe6df", wallTrim: "#2f4a3a" },
 ];
 
 function normalize(text: string) {

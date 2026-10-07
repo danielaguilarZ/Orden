@@ -88,8 +88,26 @@ export const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
     kind: "oficina",
     label: "Oficina compartida",
     keywords: ["compartid", "coworking"],
-    style: { floor: "madera", floorA: "#b08a62", floorB: "#a27d57", wall: "#e4e2da", wallTrim: "#4f5b66" },
-    kinds: ["puesto", "puesto", "puesto", "puesto", "ordenador", "ordenador", "ventana", "ventana", "pizarra", "reloj", "estanteria", "archivador", "cafetera", "planta", "planta", "lampara"],
+    // Estilo actual: microcemento claro, blanco puro y muebles modernos.
+    style: { floor: "hormigón", floorA: "#d9d6cf", floorB: "#cfccc4", wall: "#f7f7f5", wallTrim: "#3a3f45" },
+    kinds: [
+      "puesto_moderno",
+      "puesto_moderno",
+      "puesto_moderno",
+      "puesto_moderno",
+      "monitor_doble",
+      "portatil",
+      "ventana",
+      "ventana",
+      "videowall",
+      "reloj",
+      "estanteria_moderna",
+      "cafetera",
+      "planta_moderna",
+      "planta_moderna",
+      "lampara_arco",
+    ],
+    tints: { ventana: { $marco: "#2a2e35" }, reloj: { $esfera: "#ffffff" }, cafetera: { $mueble: "#f3f3f0", $maquina: "#2b2f36" } },
   },
   finanzas: {
     kind: "finanzas",
@@ -162,7 +180,7 @@ export const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
  * si no hay hueco y la plantilla de la oficina que se abre si no hay ninguna.
  */
 export const DESK_ROOMS: Record<string, { kinds: string[]; desk: string; office: string }> = {
-  orden: { kinds: ["oficina"], desk: "puesto", office: "oficina" },
+  orden: { kinds: ["oficina"], desk: "puesto_moderno", office: "oficina" },
 };
 
 function normalize(text: string) {
