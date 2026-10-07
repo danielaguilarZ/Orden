@@ -42,7 +42,7 @@ function log(...args: unknown[]) {
 
 function heartbeat() {
   try {
-    beat("worker", { pid: process.pid, startedAt, running: running.size });
+    beat("worker", { pid: process.pid, startedAt, running: running.size, max: MAX });
   } catch (err) {
     log("No pude escribir el latido:", err);
   }

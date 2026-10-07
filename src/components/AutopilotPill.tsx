@@ -12,6 +12,9 @@ export function AutopilotPill() {
   const [error, setError] = useState("");
   if (!org) return null;
   const { settings, verdict } = org.autopilot;
+  // El piloto deja siempre un hueco del worker para el usuario.
+  const workerMax = org.autopilot.workerMax ?? 3;
+  const effective = Math.max(1, Math.min(settings.maxParallel, workerMax - 1));
   const working = org.backlog.filter((i) => i.status === "en_curso").length;
   const tone = !settings.enabled ? "" : verdict.allowed ? "ok" : "warn";
   const label = !settings.enabled ? "Piloto apagado" : verdict.allowed ? `Piloto · ${working} en marcha` : "Piloto en pausa";
@@ -60,7 +63,11 @@ export function AutopilotPill() {
               <span className="row">
                 <input type="number" min={1} max={5} defaultValue={settings.maxParallel} onBlur={(e) => save({ maxParallel: Number(e.target.value) })} /> encargos
               </span>
-              <span className="hint">Siempre queda un hueco libre para ti.</span>
+              <span className="hint">
+                {effective < settings.maxParallel
+                  ? `Ahora van ${effective}: el worker admite ${workerMax} a la vez y uno queda para ti. Sube ORDEN_MAX_CONCURRENCY en .env (p. ej. a ${settings.maxParallel + 1}) y reinicia.`
+                  : "Siempre queda un hueco libre para ti."}
+              </span>
             </label>
           </div>
           {error && <p className="bad-text small">{error}</p>}

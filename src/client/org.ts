@@ -9,7 +9,7 @@ export interface OrgState {
   units: Unit[];
   roles: AgentRole[];
   backlog: BacklogItem[];
-  autopilot: { settings: AutopilotSettings; verdict: BudgetVerdict };
+  autopilot: { settings: AutopilotSettings; verdict: BudgetVerdict; workerMax?: number };
 }
 
 const ORG_EVENTS = ["unit.", "role.", "backlog.", "autopilot.", "usage."];
