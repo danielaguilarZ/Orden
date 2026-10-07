@@ -107,9 +107,11 @@ const git = (args: string[], cwd: string) => run("git", args, cwd, 120_000);
  * Prepara el índice de la copia con todo menos node_modules. En la copia es un
  * enlace al del proyecto y, fuera de Windows, git lo ve como archivo (la regla
  * «node_modules/» no lo ignora). También lo saca si una rama vieja ya lo tenía.
+ * Ojo: nada de «:(exclude)node_modules»; si .gitignore ya lo ignora, git
+ * aborta el add por nombrar una ruta ignorada.
  */
 async function stageAll(dir: string) {
-  await git(["add", "-A", "--", ".", ":(exclude)node_modules"], dir);
+  await git(["add", "-A"], dir);
   await git(["rm", "-r", "--cached", "--ignore-unmatch", "-q", "--", "node_modules"], dir);
 }
 

@@ -22,7 +22,8 @@ beforeAll(() => {
   repo = fs.mkdtempSync(path.join(os.tmpdir(), "orden-admin-"));
   gitIn(repo, "init", "-q");
   fs.writeFileSync(path.join(repo, "README.md"), "# Juguete\n");
-  fs.writeFileSync(path.join(repo, ".gitignore"), "node_modules/\ndata/\n");
+  // La misma regla que el proyecto: «node_modules» sin barra también ignora el enlace de las copias.
+  fs.writeFileSync(path.join(repo, ".gitignore"), "node_modules\ndata/\n");
   fs.mkdirSync(path.join(repo, "node_modules"));
   gitIn(repo, "add", "-A");
   gitIn(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "inicio");
