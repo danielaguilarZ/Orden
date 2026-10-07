@@ -127,8 +127,42 @@ describe("piloto automático", () => {
     const [plan] = tickAutopilot(AT).started;
     finishTask(plan.id, "done", { result: "Sin tareas útiles por ahora" });
     tickAutopilot(AT);
-    expect(Date.parse(getRole(ana.id).planAfter!) - AT.getTime()).toBeGreaterThan(7 * 3600_000);
+    expect(Date.parse(getRole(ana.id).planAfter!) - AT.getTime()).toBeGreaterThan(3 * 3600_000);
     expect(getTask(plan.id)?.data.reconciled).toBe(1);
     expect(listBacklog({ agentId: ana.id })).toHaveLength(0);
+  });
+
+  it("si su planificación dio trabajo (aunque sea a su equipo), vuelve a planificar en seguida", () => {
+    const { unit, ana } = staff();
+    const leo = hireAgent({ name: "Leo", specialty: "Diseño", model: "sonnet" });
+    setRole(leo.id, { unitId: unit.id, role: "Diseñador" });
+    setRole(ana.id, { lead: true });
+    const plan = tickAutopilot(AT).started.find((t) => t.agentId === ana.id)!;
+    // Ana reparte una tarea a Leo durante su planificación y no se apunta nada a sí misma.
+    addItem({ agentId: leo.id, title: "Rediseño de la portada", createdBy: ana.id, source: "jefe" });
+    finishTask(plan.id, "done", { result: "Una tarea para Leo" });
+    tickAutopilot(AT);
+    const wait = Date.parse(getRole(ana.id).planAfter!) - AT.getTime();
+    expect(wait).toBeGreaterThan(0);
+    expect(wait).toBeLessThanOrEqual(15 * 60_000);
+  });
+
+  it("con toda la organización sin trabajo, el jefe hace una ronda aunque esté en pausa", () => {
+    const { ana } = staff();
+    const zen = getChief()!;
+    setRole(zen.id, { role: "Director general", lead: true, planAfter: new Date(AT.getTime() + 5 * 3600_000).toISOString() });
+    setRole(ana.id, { planAfter: new Date(AT.getTime() + 5 * 3600_000).toISOString() });
+    const [round] = tickAutopilot(AT).started;
+    expect(round.agentId).toBe(zen.id);
+    expect(round.data.planning).toBe(1);
+    // Si hubo una ronda hace poco no se repite (los encargos llevan la hora real: se mide desde ahora).
+    finishTask(round.id, "done", { result: "Sin tareas útiles por ahora" });
+    const at = (min: number) => {
+      const t = new Date(Date.now() + min * 60_000);
+      setSetting("claude_usage", { ...usage(10, 10), fetchedAt: new Date(t.getTime() - 60_000).toISOString() });
+      return t;
+    };
+    expect(tickAutopilot(at(10)).started).toHaveLength(0);
+    expect(tickAutopilot(at(31)).started.map((t) => t.agentId)).toEqual([zen.id]);
   });
 });

@@ -16,9 +16,15 @@ import type { AgentRole, BacklogItem } from "./types";
  */
 
 const HOUR = 3600_000;
-/** Tras planificar, no vuelve a hacerlo antes de esto (y más si no se le ocurrió nada útil). */
+const MINUTE = 60_000;
+/** Mientras planifica no se le vuelve a pedir (es solo un cerrojo: al terminar se recalcula). */
 const PLAN_PAUSE_MS = 2 * HOUR;
-const PLAN_BACKOFF_MS = 8 * HOUR;
+/** Si su planificación dio trabajo (a él o a su equipo), puede volver a planificar en cuanto se quede sin tareas. */
+const PLAN_COOLDOWN_MS = 15 * MINUTE;
+/** Si no se le ocurrió nada útil, espera más antes de volver a intentarlo. */
+const PLAN_BACKOFF_MS = 4 * HOUR;
+/** Con toda la organización sin trabajo, el jefe hace una ronda de dirección como mucho cada tanto. */
+const CHIEF_ROUND_MS = 30 * MINUTE;
 /** Intentos de una tarea de la cartera antes de darla por bloqueada. */
 const MAX_ATTEMPTS = 2;
 
@@ -66,6 +72,16 @@ function busy(agentId: string): boolean {
   );
 }
 
+/** ¿Nadie tiene trabajo pendiente ni en marcha, y el jefe no ha hecho una ronda hace poco? */
+function orgIdle(at: Date): boolean {
+  if (listBacklog({ statuses: ["pendiente", "en_curso"], limit: 1 }).length) return false;
+  if (activeAuto().length) return false;
+  const last = getDb()
+    .prepare("SELECT MAX(t.created_at) AS at FROM tasks t JOIN agents a ON a.id = t.agent_id WHERE a.is_chief = 1 AND t.kind = 'auto' AND json_extract(t.data, '$.planning') = 1")
+    .get() as { at: string | null };
+  return !last.at || at.getTime() - Date.parse(last.at) >= CHIEF_ROUND_MS;
+}
+
 /** Último trabajo autónomo de cada agente: el que más lleva parado va primero. */
 function lastAutoAt(agentId: string): number {
   const r = getDb().prepare("SELECT MAX(created_at) AS at FROM tasks WHERE agent_id = ? AND kind = 'auto'").get(agentId) as { at: string | null };
@@ -90,12 +106,18 @@ export function reconcile(at = new Date()) {
     }
   }
   // Planificaciones terminadas sin ideas: que espere más antes de volver a intentarlo.
+  // Planificaciones terminadas: si dieron trabajo (a quien sea), pausa corta; si no, larga.
   const plans = getDb()
-    .prepare("SELECT id, agent_id FROM tasks WHERE kind = 'auto' AND json_extract(data, '$.planning') = 1 AND status IN ('done', 'error', 'cancelled') AND json_extract(data, '$.reconciled') IS NULL")
-    .all() as { id: string; agent_id: string }[];
+    .prepare(
+      "SELECT id, agent_id, created_at, finished_at FROM tasks WHERE kind = 'auto' AND json_extract(data, '$.planning') = 1 AND status IN ('done', 'error', 'cancelled') AND json_extract(data, '$.reconciled') IS NULL",
+    )
+    .all() as { id: string; agent_id: string; created_at: string; finished_at: string | null }[];
   for (const p of plans) {
-    const empty = listBacklog({ agentId: p.agent_id, statuses: ["pendiente", "en_curso"], limit: 1 }).length === 0;
-    if (empty) setRole(p.agent_id, { planAfter: new Date(at.getTime() + PLAN_BACKOFF_MS).toISOString() });
+    const created = getDb()
+      .prepare("SELECT COUNT(*) AS n FROM backlog WHERE created_by = ? AND created_at >= ? AND created_at <= ?")
+      .get(p.agent_id, p.created_at, p.finished_at ?? at.toISOString()) as { n: number };
+    const wait = created.n > 0 ? PLAN_COOLDOWN_MS : PLAN_BACKOFF_MS;
+    setRole(p.agent_id, { planAfter: new Date(at.getTime() + wait).toISOString() });
     getDb().prepare("UPDATE tasks SET data = json_set(data, '$.reconciled', 1) WHERE id = ?").run(p.id);
   }
 }
@@ -139,7 +161,9 @@ export function tickAutopilot(at = new Date(), maxWorker = 3): AutopilotTick {
       started.push(task);
       continue;
     }
-    if (role.planAfter && Date.parse(role.planAfter) > at.getTime()) continue;
+    // El jefe se salta su pausa si toda la organización se ha quedado sin trabajo (ronda de dirección).
+    const chiefRound = agent.isChief && orgIdle(at);
+    if (role.planAfter && Date.parse(role.planAfter) > at.getTime() && !chiefRound) continue;
     // Planificar: el jefe con su modelo (normalmente Opus); el resto con Sonnet, que basta.
     const model = pickModel(agent.isChief ? agent.model : agent.model === "haiku" ? "haiku" : "sonnet", verdict);
     const task = createTask({
