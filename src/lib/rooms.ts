@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { archiveRoom, createRoom, deleteRoom, getRoom, listRooms, unarchiveRoom, updateRoom } from "./repo/rooms";
 import { getAgent, listAgents, setAgentLocation, updateAgent } from "./repo/agents";
 import { tx } from "./db";
-import { applyTemplateTints, BUILDINGS, buildingLevel, DESK_ROOMS, floorLabel, pickRoomTemplate, ROOM_TEMPLATES, type RoomTemplate } from "./roomTemplates";
+import { applyTemplateTints, BUILDINGS, buildingLevel, deskRoomsFor, floorLabel, pickRoomTemplate, ROOM_TEMPLATES, type RoomTemplate } from "./roomTemplates";
 import { decorate, DESK_SETS as DESK_SETS_KINDS, removeKinds, type DecorResult } from "../living/decorator";
 import { buildingOf, DEFAULT_BUILDING, ELEVATOR_KIND, levelOf, levelOrigin, levelsOf, nextRoomPosition, ROOM_SIZE, roomFits, roomsConnected } from "../living/house";
 import { checkRoomRemoval, joinNames } from "../living/roomRemoval";
@@ -34,17 +34,31 @@ export function describeRooms(rooms: Room[], agents: Agent[], me: Pick<Agent, "i
   const levels = levelsOf(rooms);
   const head = "Salas de la casa (todas se pueden usar y decorar):";
   if (levels.length < 2) return `${head}\n${rooms.map(line).join("\n")}`;
-  // Torre con varias plantas, unidas por el núcleo de ascensores.
+  // Torre con varias plantas, unidas por el núcleo de ascensores. Con detalle
+  // (muebles) solo la planta donde está el agente: el resto, nombres y quién
+  // hay, para no gastar contexto en cada mensaje (sala_ver da el detalle).
+  const myLevel = here ? levelOf(here) : null;
+  const brief = (r: Room) => {
+    const inside = agents.filter((a) => a.id !== me.id && currentRoom(a, rooms)?.id === r.id).map((a) => a.name);
+    return `${r.name}${roomRelation(r, me) ? ` (${relation[roomRelation(r, me) ?? "ninguna"].slice(2)})` : ""}${inside.length ? ` [${inside.join(", ")}]` : ""}`;
+  };
   const groups = [...levels].reverse().map((level) => {
     const mine = rooms.filter((r) => levelOf(r) === level);
     const zones = [...new Set(mine.map(buildingOf))].map((b) => `edificio=«${b}»`).join(", ");
-    return `${floorLabel(level)} (${zones}):\n${mine.map(line).join("\n")}`;
+    if (level !== myLevel) return `${floorLabel(level)} (${zones}): ${mine.map(brief).join(" · ")}`;
+    return `${floorLabel(level)} (${zones}) ← tu planta:\n${mine.map(line).join("\n")}`;
   });
-  return `${head}\nTorre de oficinas: se cambia de planta en ascensor.\n${groups.join("\n")}`;
+  return `${head}\nTorre de oficinas: se cambia de planta en ascensor. Detalle solo de tu planta; para ver otra sala, sala_ver.\n${groups.join("\n")}`;
 }
 
 /** Salas de una planta. */
 const onLevel = (rooms: Room[], level: number) => rooms.filter((r) => levelOf(r) === level);
+
+/** Planta de una zona: la de sus salas, si ya tiene; si no, la de su configuración. */
+export function zoneLevel(rooms: Room[], building: string): number {
+  const room = rooms.find((r) => buildingOf(r) === building);
+  return room ? levelOf(room) : buildingLevel(building);
+}
 
 /**
  * Crea una sala nueva para un ámbito (con o sin agente) en el siguiente
@@ -62,12 +76,15 @@ export function buildRoom(input: {
   fixed?: boolean;
   /** Sin muebles (sala en blanco para decorar a mano). */
   empty?: boolean;
+  /** Planta (por defecto, la de su zona). */
+  level?: number;
 }): Room {
   const building = input.building ?? input.template?.building ?? DEFAULT_BUILDING;
-  const tpl = input.template && (input.template.building ?? DEFAULT_BUILDING) === building ? input.template : pickRoomTemplate(input.domain, building);
+  // Una plantilla pedida expresamente vale para cualquier zona (las de la torre son genéricas).
+  const tpl = input.template ?? pickRoomTemplate(input.domain, building);
   const rooms = listRooms();
   // Cada zona tiene su planta: la sala crece desde la esquina de esa planta (con las de su planta).
-  const level = buildingLevel(building);
+  const level = input.level ?? zoneLevel(rooms, building);
   const pos = nextRoomPosition(onLevel(rooms, level), building, { origin: levelOrigin(level) });
   const id = input.id ?? randomUUID();
   const draft: Room = {
@@ -133,8 +150,9 @@ export const BLANK_ROOM_NAME = "Sala nueva";
  * y, al decorarla, los muebles toman sus colores.
  */
 export function createBlankRoom(input: { building?: string; name?: string } = {}): Room {
-  const building = input.building && BUILDINGS[input.building] ? input.building : DEFAULT_BUILDING;
-  const template = ROOM_TEMPLATES[BUILDINGS[building].fallback];
+  const known = (b: string) => Boolean(BUILDINGS[b]) || listRooms().some((r) => buildingOf(r) === b);
+  const building = input.building && known(input.building) ? input.building : DEFAULT_BUILDING;
+  const template = ROOM_TEMPLATES[BUILDINGS[building]?.fallback ?? "oficina_abierta"] ?? ROOM_TEMPLATES.estudio;
   const name = input.name?.trim() || uniqueRoomName(BLANK_ROOM_NAME, listRooms());
   return buildRoom({ name, domain: template.label, template, building, empty: true });
 }
@@ -146,9 +164,8 @@ export function createBlankRoom(input: { building?: string; name?: string } = {}
  * que ya hay; si no cabe o no hay ninguna sala así, abre una oficina
  * compartida nueva.
  */
-export function assignDesk(specialty: string, agents: Pick<Agent, "deskSeatId">[]): { room: Room; seatId: string } {
-  const building = DEFAULT_BUILDING;
-  const cfg = DESK_ROOMS[building];
+export function assignDesk(specialty: string, agents: Pick<Agent, "deskSeatId">[], building = DEFAULT_BUILDING): { room: Room; seatId: string } {
+  const cfg = deskRoomsFor(building);
   const preferred = pickRoomTemplate(specialty, building).kind;
   const rank = (r: Room) => (r.kind === preferred ? -1 : cfg.kinds.indexOf(r.kind));
   const candidates = listRooms()

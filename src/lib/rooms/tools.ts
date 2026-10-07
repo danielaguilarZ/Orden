@@ -11,6 +11,7 @@ import { describeFinishes, FLOOR_FINISHES, WALL_FINISHES } from "../../living/fi
 import { DESK_SETS } from "../../living/decorator";
 import { currentRoom, findRoomByRef } from "../../living/presence";
 import { BUILDINGS, floorLabel } from "../roomTemplates";
+import { syncFloorNames } from "../org/floors";
 
 const BUILDING_LIST = Object.entries(BUILDINGS)
   .map(([id, b]) => `${id} (${floorLabel(b.level).toLowerCase()})`)
@@ -31,6 +32,7 @@ registerPromptSection(
 registerPromptSection(
   (agent) => {
     const me = getAgent(agent.id) ?? agent;
+    syncFloorNames();
     return describeRooms(listRooms(), listAgents(), me);
   },
   { dynamic: true },

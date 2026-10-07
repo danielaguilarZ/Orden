@@ -1,4 +1,5 @@
 import { ensureSeed } from "./seed";
+import { syncFloorNames } from "./org/floors";
 import { listAgents } from "./repo/agents";
 import { listRooms } from "./repo/rooms";
 import { getHeartbeat } from "./repo/system";
@@ -23,6 +24,7 @@ export function systemStatus() {
 export function snapshot() {
   boot();
   return {
+    floorNames: syncFloorNames(),
     agents: listAgents(),
     rooms: listRooms(),
     usage: getStoredUsage(),

@@ -65,13 +65,13 @@ export function appearanceFromName(name: string): Appearance {
  * (no se le construye sala propia) y, si su carácter es personalizado,
  * encarga (una sola vez) frases de ambiente propias.
  */
-export function hireAgent(raw: AgentInput, createdBy = "user"): Agent {
+export function hireAgent(raw: AgentInput, createdBy = "user", opts: { building?: string } = {}): Agent {
   const input = agentInputSchema.parse(raw);
   if (findAgentByName(input.name)) throw new Error(`Ya hay un agente llamado ${input.name}.`);
   const agent = tx(() => {
     const preset = getPersonality(input.personality.preset);
     // El agente nace ya con su escritorio asignado (así aparece directamente en esa sala).
-    const desk = assignDesk(input.specialty, listAgents());
+    const desk = assignDesk(input.specialty, listAgents(), opts.building);
     const agent = createAgent({
       id: randomUUID(),
       name: input.name,

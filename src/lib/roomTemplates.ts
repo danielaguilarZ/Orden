@@ -41,10 +41,17 @@ export const FLOOR_NAMES: Record<number, string> = {
   0: "Vestíbulo",
   1: "Trading",
   2: "Marketing",
-  3: "Legal",
-  4: "Terral Studio",
-  5: "Dirección",
 };
+
+/**
+ * Nombres de planta que vienen de los datos (las unidades de la organización
+ * que trabajan en cada planta). Mandan sobre `FLOOR_NAMES`. Los fija el
+ * servidor al preparar el contexto y la web al hidratarse.
+ */
+let floorNames: Record<number, string> = {};
+export function setFloorNames(names: Record<number, string>) {
+  floorNames = names;
+}
 
 /** Planta en la que se construyen las salas de una zona. */
 export function buildingLevel(building: string): number {
@@ -53,7 +60,7 @@ export function buildingLevel(building: string): number {
 
 /** «Planta 2 · Marketing». */
 export function floorLabel(level: number): string {
-  const name = FLOOR_NAMES[level] ?? Object.values(BUILDINGS).find((b) => b.level === level)?.label;
+  const name = floorNames[level] ?? FLOOR_NAMES[level] ?? Object.values(BUILDINGS).find((b) => b.level === level)?.label;
   return level === 0 ? `Planta baja${name ? ` · ${name}` : ""}` : `Planta ${level}${name ? ` · ${name}` : ""}`;
 }
 
@@ -227,6 +234,120 @@ export const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
     kinds: ["mesa_comedor", "silla_ergonomica", "silla_ergonomica", "corcho", "videowall", "pizarra", "estanteria_moderna", "planta_moderna", "planta_moderna", "cafetera", "neon"],
     tints: { mesa_comedor: { $madera: "#f3f3f0" }, neon: { $luz: "#ff4fd8" }, cafetera: { $mueble: "#f3f3f0", $maquina: "#2b2f36" } },
   },
+  // ───────────── Torre de oficinas (plantas por unidad) ─────────────
+  // Plantillas genéricas: no pertenecen a ninguna zona, se piden expresamente
+  // al montar una planta (todas las plantas tienen la misma huella de 3×2 salas).
+  recepcion_vestibulo: {
+    kind: "recepcion_vestibulo",
+    label: "Recepción",
+    keywords: [],
+    building: "torre",
+    style: { floor: "mármol", floorA: "#ecebe7", floorB: "#dcdbd6", wall: "#f7f7f5", wallTrim: "#3a3f45" },
+    kinds: ["ascensor", "puesto_moderno", "pantalla_led", "sofa_modular", "mesa_centro", "alfombra_moderna", "arte_abstracto", "planta_moderna", "planta_moderna", "lampara_arco"],
+    tints: { mesa_centro: { $madera: "#3b2a20" } },
+  },
+  sala_espera: {
+    kind: "sala_espera",
+    label: "Sala de espera",
+    keywords: [],
+    building: "torre",
+    style: { floor: "mármol", floorA: "#d5d8dc", floorB: "#c3c7cc", wall: "#e8e6dc", wallTrim: "#46624f" },
+    kinds: ["sofa_modular", "sofa_modular", "mesa_centro", "alfombra_moderna", "tele", "ventana", "planta_moderna", "planta_moderna", "lampara_arco", "arte_abstracto"],
+  },
+  recepcion_planta: {
+    kind: "recepcion_planta",
+    label: "Recepción de planta",
+    keywords: [],
+    building: "torre",
+    style: { floor: "hormigón", floorA: "#d9d6cf", floorB: "#cfccc4", wall: "#e8edf2", wallTrim: "#34495e" },
+    kinds: ["ascensor", "sofa_modular", "mesa_centro", "alfombra_moderna", "arte_abstracto", "planta_moderna", "planta_moderna", "lampara_arco", "reloj"],
+  },
+  oficina_abierta: {
+    kind: "oficina_abierta",
+    label: "Oficina abierta",
+    keywords: [],
+    building: "torre",
+    style: { floor: "madera", floorA: "#dcc39c", floorB: "#d2b88f", wall: "#f7f7f5", wallTrim: "#3a3f45" },
+    kinds: ["puesto_moderno", "puesto_moderno", "puesto_moderno", "puesto_moderno", "monitor_doble", "portatil", "ventana", "ventana", "estanteria_moderna", "planta_moderna", "reloj"],
+    tints: { ventana: { $marco: "#2a2e35" } },
+  },
+  despacho_responsable: {
+    kind: "despacho_responsable",
+    label: "Despacho",
+    keywords: [],
+    building: "torre",
+    style: { floor: "madera", floorA: "#8a5a3b", floorB: "#7c5034", wall: "#ece6d6", wallTrim: "#6d5d3f" },
+    kinds: ["puesto_moderno", "monitor_doble", "ventana", "ventana", "sofa_modular", "mesa_centro", "estanteria_moderna", "panel_listones", "lampara_arco", "alfombra_moderna", "planta_moderna"],
+    tints: { ventana: { $marco: "#2a2e35" } },
+  },
+  sala_reuniones: {
+    kind: "sala_reuniones",
+    label: "Sala de reuniones",
+    keywords: [],
+    building: "torre",
+    style: { floor: "moqueta", floorA: "#9a9a9e", floorB: "#8f8f94", wall: "#dfe3e8", wallTrim: "#5d6875" },
+    kinds: ["mesa_comedor", "silla_ergonomica", "silla_ergonomica", "silla_ergonomica", "silla_ergonomica", "pantalla_led", "pizarra", "ventana", "planta_moderna", "reloj"],
+    tints: { mesa_comedor: { $madera: "#3b2a20" } },
+  },
+  zona_cafe: {
+    kind: "zona_cafe",
+    label: "Office",
+    keywords: [],
+    building: "torre",
+    style: { floor: "baldosa", floorA: "#e9e4d8", floorB: "#c9b99a", wall: "#f2efe8", wallTrim: "#8a7f6e" },
+    kinds: ["cafetera", "nevera", "mesa_comedor", "silla", "silla", "ventana", "planta_moderna", "corcho", "taza"],
+  },
+  biblioteca_juridica: {
+    kind: "biblioteca_juridica",
+    label: "Biblioteca jurídica",
+    keywords: [],
+    building: "torre",
+    style: { floor: "madera", floorA: "#8a5a3b", floorB: "#7c5034", wall: "#e9dfc9", wallTrim: "#4e3626" },
+    kinds: ["estanteria", "estanteria", "estanteria", "libros_pila", "puesto", "lampara_mesa", "sillon", "sillon", "archivador", "alfombra", "lampara"],
+  },
+  sala_pantallas: {
+    kind: "sala_pantallas",
+    label: "Sala de pantallas",
+    keywords: [],
+    building: "torre",
+    style: { floor: "mármol", floorA: "#4a4d52", floorB: "#414449", wall: "#cfd3d8", wallTrim: "#2a2e35" },
+    kinds: ["videowall", "videowall", "pantalla_led", "puesto_moderno", "puesto_moderno", "monitor_doble", "monitor_doble", "cajas", "planta_moderna"],
+  },
+  estudio_diseno: {
+    kind: "estudio_diseno",
+    label: "Estudio de diseño",
+    keywords: [],
+    building: "torre",
+    style: { floor: "hormigón", floorA: "#b5b5b0", floorB: "#a8a8a3", wall: "#f7f7f5", wallTrim: "#3a3f45" },
+    kinds: ["mesa_comedor", "silla_ergonomica", "silla_ergonomica", "monitor_doble", "corcho", "pizarra", "arte_abstracto", "neon", "estanteria_moderna", "planta_moderna"],
+    tints: { mesa_comedor: { $madera: "#f3f3f0" }, neon: { $luz: "#e8b04a" } },
+  },
+  laboratorio_producto: {
+    kind: "laboratorio_producto",
+    label: "Laboratorio de producto",
+    keywords: [],
+    building: "torre",
+    style: { floor: "hormigón", floorA: "#d9d6cf", floorB: "#cfccc4", wall: "#e3eef0", wallTrim: "#2f5d62" },
+    kinds: ["cinta", "esterilla", "pantalla_led", "puesto_moderno", "monitor_doble", "portatil", "corcho", "planta_moderna"],
+  },
+  sala_juntas: {
+    kind: "sala_juntas",
+    label: "Sala de juntas",
+    keywords: [],
+    building: "torre",
+    style: { floor: "madera", floorA: "#8a5a3b", floorB: "#7c5034", wall: "#e6dccb", wallTrim: "#6b5440" },
+    kinds: ["mesa_comedor", "silla_ergonomica", "silla_ergonomica", "silla_ergonomica", "silla_ergonomica", "silla_ergonomica", "silla_ergonomica", "videowall", "ventana", "ventana", "planta_moderna"],
+    tints: { mesa_comedor: { $madera: "#3b2a20" }, ventana: { $marco: "#2a2e35" } },
+  },
+  despacho_direccion: {
+    kind: "despacho_direccion",
+    label: "Despacho de dirección",
+    keywords: [],
+    building: "torre",
+    style: { floor: "madera", floorA: "#8a5a3b", floorB: "#7c5034", wall: "#e9dfc9", wallTrim: "#4e3626" },
+    kinds: ["escritorio_moderno", "silla_ergonomica", "monitor_doble", "ventana", "ventana", "ventana", "sofa_modular", "mesa_centro", "estanteria_moderna", "caja_fuerte", "lampara_arco", "alfombra_moderna", "arte_abstracto", "planta_moderna"],
+    tints: { ventana: { $marco: "#2a2e35" } },
+  },
 };
 
 /**
@@ -237,6 +358,11 @@ export const ROOM_TEMPLATES: Record<string, RoomTemplate> = {
 export const DESK_ROOMS: Record<string, { kinds: string[]; desk: string; office: string }> = {
   orden: { kinds: ["oficina"], desk: "puesto_moderno", office: "oficina" },
 };
+
+/** Escritorios de una zona: los suyos o, en las plantas de la torre, la oficina abierta. */
+export function deskRoomsFor(building: string): { kinds: string[]; desk: string; office: string } {
+  return DESK_ROOMS[building] ?? { kinds: ["oficina_abierta", "oficina"], desk: "puesto_moderno", office: "oficina_abierta" };
+}
 
 function normalize(text: string) {
   return text

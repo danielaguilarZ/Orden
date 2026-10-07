@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { setFloorNames } from "@/lib/roomTemplates";
 import type { Agent, AgentStatus, FurnitureItem, HeartbeatInfo, OrdenEvent, Room, RoomStyle } from "@/lib/types";
 import type { ClaudeStatus } from "@/lib/claude/auth";
 import type { ClaudeUsage } from "@/lib/claude/usageText";
@@ -69,8 +70,10 @@ export function hydrate(init: {
   system: { worker: HeartbeatInfo | null };
   decisionsPending?: number;
   lastEventId: number;
+  floorNames?: Record<number, string>;
 }) {
   if (state.lastEventId > init.lastEventId) return;
+  if (init.floorNames) setFloorNames(init.floorNames);
   set({
     agents: init.agents,
     rooms: init.rooms,
