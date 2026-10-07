@@ -103,6 +103,16 @@ export function run(cmd: string, args: string[], cwd: string, timeoutMs = 10 * 6
 
 const git = (args: string[], cwd: string) => run("git", args, cwd, 120_000);
 
+/**
+ * Prepara el índice de la copia con todo menos node_modules. En la copia es un
+ * enlace al del proyecto y, fuera de Windows, git lo ve como archivo (la regla
+ * «node_modules/» no lo ignora). También lo saca si una rama vieja ya lo tenía.
+ */
+async function stageAll(dir: string) {
+  await git(["add", "-A", "--", ".", ":(exclude)node_modules"], dir);
+  await git(["rm", "-r", "--cached", "--ignore-unmatch", "-q", "--", "node_modules"], dir);
+}
+
 export async function gitAvailable(): Promise<boolean> {
   try {
     await git(["rev-parse", "--is-inside-work-tree"], repoRoot());
@@ -175,7 +185,7 @@ export async function ensureWorkspace(agent: Agent): Promise<{ dir: string; bran
 export async function captureChanges(agent: Agent, taskId: string, summary: string): Promise<CodeChange | null> {
   const { dir, branch } = workspacePaths(agent);
   if (!fs.existsSync(dir)) return null;
-  await git(["add", "-A"], dir);
+  await stageAll(dir);
   // Se compara con la versión ACTUAL de la app (la copia puede tener commits propios).
   const appHead = (await git(["rev-parse", "HEAD"], repoRoot())).trim();
   const numstat = (await git(["diff", "--cached", "--numstat", appHead], dir)).trim();
@@ -210,7 +220,7 @@ export async function captureChanges(agent: Agent, taskId: string, summary: stri
 export async function changeDiff(id: string): Promise<string> {
   const c = getChange(id);
   if (!c || !fs.existsSync(c.worktree)) return "";
-  await git(["add", "-A"], c.worktree);
+  await stageAll(c.worktree);
   const appHead = (await git(["rev-parse", "HEAD"], repoRoot())).trim();
   const diff = await git(["diff", "--cached", "--no-color", appHead], c.worktree);
   return diff.length > 400_000 ? diff.slice(0, 400_000) + "\n… (recortado)" : diff;
@@ -285,7 +295,7 @@ export async function applyChange(id: string, opts: { wait?: boolean } = {}): Pr
       const first = (c.summary.split("\n").find((l) => l.trim()) ?? "Cambios").replace(/[#*`]/g, "").trim().slice(0, 72);
 
       // 1. Guardar el trabajo del agente en su rama.
-      await git(["add", "-A"], dir);
+      await stageAll(dir);
       if ((await git(["diff", "--cached", "--name-only"], dir)).trim()) {
         await git([...who, "commit", "-m", `${name}: ${first}`, "-m", c.summary.slice(0, 4000)], dir);
       }
