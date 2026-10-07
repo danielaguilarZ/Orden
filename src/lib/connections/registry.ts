@@ -19,7 +19,7 @@ export interface ServiceInfo {
   /** Qué permite cada nivel (se muestra en la interfaz). */
   levels: Record<GrantLevel, string>;
   /** Campos de configuración que pide la interfaz. */
-  fields: { key: string; label: string; placeholder?: string }[];
+  fields: { key: string; label: string; placeholder?: string; hint?: string; presets?: { label: string; value: string }[] }[];
   /** Admite credencial guardada (token) además de la del sistema. */
   supportsSecret: boolean;
   /** Cómo se autoriza: token/gh (GitHub) u OAuth en el navegador (Google). */

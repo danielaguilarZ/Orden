@@ -3,14 +3,17 @@ import { defineTool, fail, ok, type ToolContext, type ToolDef } from "../../agen
 import { logActivity } from "../../repo/system";
 import { redact } from "../../secrets";
 import type { AgentGrant } from "../registry";
-import { RepoApi, resolveTransport, safeBranch, safePath, safeSha, type ContentItem, type IssueItem } from "./api";
+import { parseRepo, RepoApi, resolveTransport, safeBranch, safePath, safeSha, type ContentItem, type IssueItem } from "./api";
+import { inScope, isWildcard, listScopeRepos, scopeLabel } from "./scope";
 import { fetchSnapshot, statusMarkdown } from "./status";
 
 /**
  * Herramientas de GitHub para un agente. Solo aparecen las de su nivel:
  * - lectura: leer código, commits, issues y PRs, buscar y comentar.
  * - completo: además crear/editar issues, ramas, commits y PRs.
- * El repo sale SIEMPRE de la conexión: el agente no puede indicar otro.
+ * El repo sale SIEMPRE de la conexión: el agente no puede indicar otro. Si la
+ * conexión cubre varios («propietario/*» o «*»), el agente elige uno dentro de
+ * ese alcance y GitHub pone el límite real (lo que la cuenta puede ver o escribir).
  */
 
 const MAX_OUT = 30_000;
@@ -29,19 +32,34 @@ export const signature = (agentName: string) => `\n\n---\n_Escrito por ${agentNa
 
 export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
   if (!grants.length) return [];
-  const repos = grants.map((g) => String(g.connection.config.repo));
-  const fullRepos = grants.filter((g) => g.level === "completo").map((g) => String(g.connection.config.repo));
-  const multi = repos.length > 1;
+  const scopeOf = (g: AgentGrant) => String(g.connection.config.repo);
+  const repos = grants.map(scopeOf);
+  const fullRepos = grants.filter((g) => g.level === "completo").map(scopeOf);
+  const wildcard = repos.some(isWildcard);
+  const multi = repos.length > 1 || wildcard;
 
   /** Parámetro «repo» solo si tiene varios; siempre limitado a los suyos. */
-  const repoShape = (list: string[]): Record<string, z.ZodType> =>
-    multi && list.length ? { repo: z.enum(list as [string, ...string[]]).describe("Repo (solo los que tienes conectados)") } : {};
+  const repoShape = (list: string[]): Record<string, z.ZodType> => {
+    if (!multi || !list.length) return {};
+    if (list.some(isWildcard)) return { repo: z.string().describe("Repo «propietario/nombre» dentro de tu acceso (github_repos los lista)") };
+    return { repo: z.enum(list as [string, ...string[]]).describe("Repo (solo los que tienes conectados)") };
+  };
 
-  const pick = (repo: unknown, needFull: boolean): AgentGrant => {
+  /** Conexión y repo para una llamada: el repo concreto pedido, o el único que tiene. */
+  const pick = (repo: unknown, needFull: boolean): { g: AgentGrant; full: string } => {
     const list = needFull ? grants.filter((g) => g.level === "completo") : grants;
-    const g = repo ? list.find((x) => x.connection.config.repo === repo) : list[0];
-    if (!g) throw new Error(needFull ? "No tienes permiso de escritura en ese repo." : "No tienes acceso a ese repo.");
-    return g;
+    const denied = needFull ? "No tienes permiso de escritura en ese repo." : "No tienes acceso a ese repo.";
+    if (!repo) {
+      const g = list[0];
+      if (!g) throw new Error(denied);
+      if (isWildcard(scopeOf(g))) throw new Error("Indica el repo («propietario/nombre»): usa github_repos para ver cuáles tienes.");
+      return { g, full: scopeOf(g) };
+    }
+    const full = parseRepo(repo).full;
+    // Mejor una conexión de ese repo concreto que una general.
+    const g = list.find((x) => !isWildcard(scopeOf(x)) && inScope(scopeOf(x), full)) ?? list.find((x) => inScope(scopeOf(x), full));
+    if (!g) throw new Error(denied);
+    return { g, full };
   };
 
   /** Envuelve cada herramienta: elige conexión, abre el cliente y limpia errores. */
@@ -49,9 +67,9 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
     <A,>(needFull: boolean, fn: (api: RepoApi, args: A, g: AgentGrant) => Promise<string>) =>
     async (args: A) => {
       try {
-        const g = pick((args as { repo?: string }).repo, needFull);
+        const { g, full } = pick((args as { repo?: string }).repo, needFull);
         const { transport } = await resolveTransport(g.connection);
-        return ok(clip(await fn(new RepoApi(String(g.connection.config.repo), transport), args, g)));
+        return ok(clip(await fn(new RepoApi(full, transport), args, g)));
       } catch (err) {
         return fail(`GitHub: ${redact((err as Error).message)}`);
       }
@@ -219,6 +237,39 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
       }),
     ),
   ];
+
+  // Con acceso a varios repos de golpe, el agente necesita ver cuáles son.
+  if (wildcard) {
+    read.unshift(
+      defineTool(
+        "github_repos",
+        "Lista los repos de GitHub a los que tienes acceso (los más activos primero), con tu permiso en cada uno.",
+        { filtro: z.string().optional().describe("Texto para filtrar por nombre") },
+        async ({ filtro }) => {
+          try {
+            const seen = new Map<string, string>();
+            for (const g of grants.filter((x) => isWildcard(scopeOf(x)))) {
+              const { transport } = await resolveTransport(g.connection);
+              for (const r of await listScopeRepos(transport, scopeOf(g))) {
+                const level = pick(r.full_name, false).g.level;
+                const canWrite = grants.some((x) => x.level === "completo" && inScope(scopeOf(x), r.full_name)) && r.permissions?.push !== false;
+                seen.set(
+                  r.full_name,
+                  `- ${r.full_name}${r.private ? " (privado)" : ""}${r.archived ? " (archivado)" : ""} · ${canWrite ? "completo" : level === "completo" ? "lectura (la cuenta no puede escribir)" : "lectura"}${r.pushed_at ? ` · último push ${day(r.pushed_at)}` : ""}${r.description ? ` · ${r.description.slice(0, 100)}` : ""}`,
+                );
+              }
+            }
+            for (const scope of repos.filter((x) => !isWildcard(x))) if (!seen.has(scope)) seen.set(scope, `- ${scope}`);
+            const q = filtro?.toLowerCase();
+            const lines = [...seen.entries()].filter(([name]) => !q || name.toLowerCase().includes(q)).map(([, line]) => line);
+            return ok(clip(lines.length ? `${lines.length} repo(s) (${repos.map(scopeLabel).join(" + ")}):\n${lines.join("\n")}` : "Ningún repo coincide."));
+          } catch (err) {
+            return fail(`GitHub: ${redact((err as Error).message)}`);
+          }
+        },
+      ),
+    );
+  }
 
   if (!fullRepos.length) return read;
 

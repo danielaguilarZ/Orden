@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ConnField } from "./ConnField";
 import { api, onEvent, useStore } from "@/client/store";
 import type { ServiceInfo } from "@/lib/connections/registry";
 import { UPCOMING_SERVICES } from "@/lib/connections/catalog";
@@ -385,10 +386,7 @@ function ConfigFields({ conn, service, patch }: { conn: ConnView; service?: Serv
       }}
     >
       {fields.map((f) => (
-        <label key={f.key} className="conn-field">
-          <span>{f.label}</span>
-          <input value={config[f.key] ?? ""} placeholder={f.placeholder} onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })} />
-        </label>
+        <ConnField key={f.key} field={f} value={config[f.key] ?? ""} onChange={(v) => setConfig({ ...config, [f.key]: v })} />
       ))}
       {dirty && (
         <div className="conn-row end">
@@ -599,10 +597,7 @@ function AddModal({ service, onClose, onAdded }: { service: ServiceInfo; onClose
           <div className="conn-modal-section">
             <h3>Datos de la conexión</h3>
             {service.fields.map((f) => (
-              <label key={f.key} className="conn-field">
-                <span>{f.label}</span>
-                <input value={config[f.key] ?? ""} placeholder={f.placeholder} onChange={(e) => setConfig({ ...config, [f.key]: e.target.value })} />
-              </label>
+              <ConnField key={f.key} field={f} value={config[f.key] ?? ""} onChange={(v) => setConfig({ ...config, [f.key]: v })} />
             ))}
             {service.supportsSecret && (
               <label className="conn-field">

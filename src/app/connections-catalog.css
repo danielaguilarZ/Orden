@@ -70,6 +70,21 @@
 .conn-row input {
   padding: 5px 8px;
 }
+.conn-field-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.conn-field-row input {
+  flex: 1;
+  min-width: 0;
+}
+.conn-field > .hint {
+  grid-column: 2;
+  font-size: 12px;
+  line-height: 1.4;
+}
 .conn-row {
   display: flex;
   gap: 8px;
