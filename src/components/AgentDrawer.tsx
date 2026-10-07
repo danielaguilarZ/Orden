@@ -9,6 +9,7 @@ import { AvatarPreview } from "./AvatarPreview";
 import { AgentChat } from "./AgentChat";
 import { AgentForm } from "./AgentForm";
 import { RoutinesTab } from "./RoutinesTab";
+import { PuestoTab } from "./PuestoTab";
 import { RoomSection } from "./RoomSection";
 
 export const STATUS_LABEL: Record<string, string> = {
@@ -23,7 +24,7 @@ const MODEL: Record<string, string> = { haiku: "Haiku", sonnet: "Sonnet", opus: 
 
 /** Panel lateral del agente: chat directo y ficha. */
 export function AgentDrawer({ agent, onClose }: { agent: Agent; onClose: () => void }) {
-  const [tab, setTab] = useState<"chat" | "rutinas" | "ficha">("chat");
+  const [tab, setTab] = useState<"chat" | "puesto" | "rutinas" | "ficha">("chat");
   const [editing, setEditing] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
   const status = agent.paused ? "sleeping" : agent.status;
@@ -63,6 +64,9 @@ export function AgentDrawer({ agent, onClose }: { agent: Agent; onClose: () => v
         <button className={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")}>
           Chat
         </button>
+        <button className={tab === "puesto" ? "on" : ""} onClick={() => setTab("puesto")}>
+          Puesto
+        </button>
         <button className={tab === "rutinas" ? "on" : ""} onClick={() => setTab("rutinas")}>
           Rutinas
         </button>
@@ -72,6 +76,8 @@ export function AgentDrawer({ agent, onClose }: { agent: Agent; onClose: () => v
       </nav>
       {tab === "chat" ? (
         <AgentChat agent={agent} autoFocus />
+      ) : tab === "puesto" ? (
+        <PuestoTab agent={agent} />
       ) : tab === "rutinas" ? (
         <RoutinesTab agent={agent} />
       ) : (

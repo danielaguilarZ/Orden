@@ -29,7 +29,8 @@ export const ADMIN_ALLOWED = [
 ];
 
 export function isAdminTask(agent: Agent, kind: string) {
-  return agent.admin && kind !== "ambient";
+  // El trabajo autónomo no abre el taller de código: los cambios de código se piden a mano.
+  return agent.admin && kind !== "ambient" && kind !== "auto";
 }
 
 registerPromptSection((agent) =>

@@ -1,0 +1,197 @@
+/* ───────────── Organización, puesto y piloto automático ───────────── */
+
+/* Piloto automático (barra superior) */
+.autopilot {
+  position: relative;
+}
+
+.pill.warn {
+  color: var(--text);
+  border-color: rgba(240, 184, 74, 0.45);
+}
+.pill.warn .dot {
+  background: var(--warn);
+  box-shadow: 0 0 8px var(--warn);
+}
+
+.autopilot-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.autopilot-pop p {
+  margin: 0;
+}
+
+.switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.switch-row > span:first-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.autopilot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.autopilot-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.autopilot-grid .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+
+.autopilot-grid input {
+  width: 64px;
+}
+
+/* Pestaña «Puesto» */
+.puesto {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.puesto > .ui-section-head,
+.puesto > .ui-stack,
+.puesto > .ui-empty {
+  padding: 0 16px;
+}
+
+.role-form,
+.item-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 4px;
+}
+
+.item-form {
+  margin: 0 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+
+.role-form .row,
+.item-form .row,
+.unit-form .row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.role-form label,
+.unit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 140px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.role-form label.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+
+.ui-detail.result {
+  color: var(--ok);
+}
+
+/* Página «Organización» */
+.org-units {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.unit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.org-members {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.org-member {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.org-member:hover {
+  border-color: var(--accent);
+}
+
+.org-member-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.org-member-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .autopilot-grid {
+    grid-template-columns: 1fr;
+  }
+}

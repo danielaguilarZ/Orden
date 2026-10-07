@@ -14,11 +14,13 @@ import { tickRoutines } from "../src/lib/routines/runner";
 import { refreshUsage } from "../src/lib/claude/usage";
 import { ensureFilesSeed } from "../src/lib/files/repo";
 import { dispatchAnswered } from "../src/lib/decisions/repo";
+import { tickAutopilot } from "../src/lib/org/autopilot";
 
 const HEARTBEAT_MS = 10_000;
 const TICK_MS = 400;
 const ROUTINE_TICK_MS = 15_000;
 const USAGE_EVERY_MS = 5 * 60_000;
+const AUTOPILOT_TICK_MS = 20_000;
 
 /** Límites de Claude: periódicamente y poco después de cada encargo (no gasta uso). */
 let usageTimer: ReturnType<typeof setTimeout> | null = null;
@@ -106,11 +108,21 @@ function main() {
   routines();
   scheduleUsage(1000);
 
+  // Piloto automático: el equipo trabaja por su cuenta mientras el regulador lo permita.
+  const autopilot = () => {
+    try {
+      for (const t of tickAutopilot(new Date(), MAX).started) log(`🤖 ${t.title.slice(0, 60)}`);
+    } catch (err) {
+      log("Error en el piloto automático:", err);
+    }
+  };
+
   const timers = [
     setInterval(() => scheduleUsage(0), USAGE_EVERY_MS),
     setInterval(heartbeat, HEARTBEAT_MS),
     setInterval(tick, TICK_MS),
     setInterval(routines, ROUTINE_TICK_MS),
+    setInterval(autopilot, AUTOPILOT_TICK_MS),
     setInterval(() => pruneEvents(), 10 * 60_000),
   ];
 

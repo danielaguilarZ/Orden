@@ -6,9 +6,11 @@ import { connect, hydrate, refreshClaude, useStore } from "@/client/store";
 import type { Snapshot } from "@/lib/server";
 import { TAB_LABEL } from "@/lib/decisions/labels";
 import { ConnectClaudeDialog } from "./ConnectClaudeDialog";
+import { AutopilotPill } from "./AutopilotPill";
 
 const NAV = [
   { key: "living", href: "/", label: "Living" },
+  { key: "organizacion", href: "/organizacion", label: "Organización" },
   { key: "archivos", href: "/archivos", label: "Archivos" },
   { key: "memoria", href: "/memoria", label: "Memoria" },
   { key: "actividad", href: "/actividad", label: "Actividad" },
@@ -46,6 +48,7 @@ export function AppShell({ initial, active, children }: { initial: Snapshot; act
           ))}
         </nav>
         <div className="pills">
+          <AutopilotPill />
           <WorkerPill />
           <ClaudePill />
         </div>

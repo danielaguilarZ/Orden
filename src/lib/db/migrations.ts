@@ -586,4 +586,63 @@ export const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 18,
+    name: "organizacion",
+    up: (db) => {
+      db.exec(`
+        -- Unidades de la organización: dirección, departamentos que dan servicio
+        -- a todo el grupo y una por empresa o ámbito (incluido lo personal).
+        -- kind: direccion | departamento | empresa | personal. building: zona
+        -- del living donde trabaja (su planta), null si aún no tiene.
+        CREATE TABLE units (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          kind TEXT NOT NULL DEFAULT 'empresa',
+          summary TEXT NOT NULL DEFAULT '',
+          goals TEXT NOT NULL DEFAULT '',
+          building TEXT,
+          position INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX units_name ON units(name COLLATE NOCASE);
+
+        -- Puesto de cada agente: unidad, cargo, funciones y si la dirige.
+        -- plan_after: hasta cuándo no vuelve a planificar si se quedó sin ideas.
+        CREATE TABLE agent_roles (
+          agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+          unit_id TEXT REFERENCES units(id) ON DELETE SET NULL,
+          role TEXT NOT NULL DEFAULT '',
+          duties TEXT NOT NULL DEFAULT '',
+          lead INTEGER NOT NULL DEFAULT 0,
+          plan_after TEXT,
+          updated_at TEXT NOT NULL
+        );
+
+        -- Cartera de trabajo de cada agente: lo que hace cuando nadie le pide nada.
+        -- status: pendiente | en_curso | hecha | descartada. priority: 1 alta, 2 media, 3 baja.
+        -- unit_id: para qué empresa o unidad es. model: modelo sugerido (null = el del agente).
+        CREATE TABLE backlog (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+          unit_id TEXT REFERENCES units(id) ON DELETE SET NULL,
+          title TEXT NOT NULL,
+          detail TEXT NOT NULL DEFAULT '',
+          priority INTEGER NOT NULL DEFAULT 2,
+          model TEXT,
+          status TEXT NOT NULL DEFAULT 'pendiente',
+          source TEXT NOT NULL DEFAULT 'usuario',
+          created_by TEXT,
+          task_id TEXT,
+          attempts INTEGER NOT NULL DEFAULT 0,
+          result TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          done_at TEXT
+        );
+        CREATE INDEX backlog_agent_status ON backlog(agent_id, status, priority);
+      `);
+    },
+  },
 ];

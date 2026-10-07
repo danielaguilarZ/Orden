@@ -12,7 +12,7 @@ import { ADMIN_ALLOWED, ADMIN_TOOLS, isAdminTask } from "../dev/admin";
 import { captureChanges, ensureWorkspace } from "../dev/workspace";
 import { createHash } from "node:crypto";
 import { buildTools } from "./tools";
-import type { Agent, Task, TaskUsage } from "../types";
+import type { Agent, ModelChoice, Task, TaskUsage } from "../types";
 
 /**
  * Ejecuta un encargo con el Claude Agent SDK.
@@ -24,6 +24,17 @@ import type { Agent, Task, TaskUsage } from "../types";
 export type QueryFn = typeof sdkQuery;
 
 const MODEL_IDS: Record<string, string> = { haiku: "haiku", sonnet: "sonnet", opus: "opus" };
+
+/** Modelo de un encargo: el que pida el propio encargo (p. ej. el piloto automático) o el del agente. */
+function taskModel(agent: Agent, task: Task): ModelChoice {
+  const m = task.data.model;
+  return m === "haiku" || m === "sonnet" || m === "opus" ? m : agent.model;
+}
+
+/** Tipo de entrada en Actividad según el origen del encargo. */
+function activityKind(task: Task) {
+  return task.kind === "routine" ? "rutina" : task.kind === "auto" ? "autonomo" : "encargo";
+}
 
 function agentsCwd(): string {
   // Carpeta neutra: así el SDK no carga CLAUDE.md ni ajustes de ningún proyecto.
@@ -96,7 +107,7 @@ export async function runTask(task: Task, opts: RunOptions = {}): Promise<Task> 
 
   const conv = task.conversationId ? getConversation(task.conversationId) : null;
   setAgentStatus(agent.id, "working", short(task.kind === "chat" ? "Pensando…" : task.title));
-  logActivity(task.kind === "routine" ? "rutina" : "encargo", `${agent.name} empieza: ${short(task.title, 90)}`, agent.id, { taskId: task.id });
+  logActivity(activityKind(task), `${agent.name} empieza: ${short(task.title, 90)}`, agent.id, { taskId: task.id });
 
   const notes: string[] = [];
   const ctx = {
@@ -147,7 +158,7 @@ export async function runTask(task: Task, opts: RunOptions = {}): Promise<Task> 
     const q = queryFn({
       prompt: buildUserMessage(agent, task, recapFor(resumeId)),
       options: {
-        ...baseOptions(agent, abort),
+        ...baseOptions({ ...agent, model: taskModel(agent, task) }, abort),
         ...devOptions,
         systemPrompt,
         mcpServers: { orden: server },
@@ -223,7 +234,7 @@ export async function runTask(task: Task, opts: RunOptions = {}): Promise<Task> 
     const finalText = lastText || result.result || (notes.length ? notes.join("\n") : "Hecho.");
     if (admin) await reportChanges(finalText);
     const done = finishTask(task.id, "done", { result: finalText, usage });
-    logActivity(task.kind === "routine" ? "rutina" : "encargo", `${agent.name} termina: ${short(task.title, 90)}`, agent.id, {
+    logActivity(activityKind(task), `${agent.name} termina: ${short(task.title, 90)}`, agent.id, {
       taskId: task.id,
     });
     if (task.kind === "delegation" && task.parentId) {

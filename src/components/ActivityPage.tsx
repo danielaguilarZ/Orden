@@ -19,6 +19,7 @@ const KINDS: Record<string, { label: string; icon: string }> = {
   archivos: { label: "Archivos", icon: "📁" },
   decisiones: { label: "Decisiones", icon: "⚖️" },
   propuestas: { label: "Propuestas (antiguas)", icon: "💡" },
+  autonomo: { label: "Piloto automático", icon: "🤖" },
   error: { label: "Errores", icon: "⚠️" },
   sistema: { label: "Sistema", icon: "⚙️" },
 };

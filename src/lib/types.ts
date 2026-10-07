@@ -125,7 +125,8 @@ export interface HeartbeatInfo {
   info: Record<string, unknown>;
 }
 
-export type TaskKind = "chat" | "delegation" | "routine" | "ambient";
+/** auto: trabajo que el piloto automático saca de la cartera del agente. */
+export type TaskKind = "chat" | "delegation" | "routine" | "ambient" | "auto";
 export type TaskStatus = "queued" | "running" | "waiting" | "done" | "error" | "cancelled";
 
 export interface Task {

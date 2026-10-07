@@ -9,6 +9,7 @@ import "./connections.css";
 import "./files.css";
 import "./decisions.css";
 import "./ui-kit.css";
+import "./org.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-body" });
 const pixel = Pixelify_Sans({ subsets: ["latin"], variable: "--font-pixel" });
