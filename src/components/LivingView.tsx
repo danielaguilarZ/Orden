@@ -155,7 +155,7 @@ export function LivingView() {
             sendOrder();
           }}
         >
-          <input value={order} onChange={(e) => setOrder(e.target.value)} placeholder="Encárgale algo a Zen…" />
+          <input value={order} onChange={(e) => setOrder(e.target.value)} placeholder={`Encárgale algo a ${chief?.name ?? "Zen"}…`} />
           <button className="btn primary" disabled={!order.trim() || sending}>
             Encargar
           </button>

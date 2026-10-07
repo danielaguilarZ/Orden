@@ -107,7 +107,7 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
           <div className="form-col">
             <label>
               Nombre
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ana" disabled={agent?.isChief} required />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ana" required />
             </label>
             <label>
               Especialidad o ámbito
@@ -116,7 +116,7 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
                 onChange={(e) => setSpecialty(e.target.value)}
                 placeholder="Finanzas personales: presupuesto, gastos y ahorro"
               />
-              <span className="hint">Decide en qué le delegará Zen.</span>
+              <span className="hint">Decide en qué le delegará el jefe del equipo.</span>
             </label>
             <label>
               Instrucciones
@@ -148,19 +148,17 @@ export function AgentForm({ agent, onClose, onSaved }: { agent?: Agent; onClose:
               </select>
               <span className="hint">{presetInfo.description}</span>
             </label>
-            {!agent?.isChief && (
-              <label className={`admin-opt ${admin ? "on" : ""}`}>
-                <span className="row">
-                  <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} />
-                  <strong>Rol admin: puede programar mejoras de Orden</strong>
-                </span>
-                <span className="hint">
-                  Trabaja en una copia aparte del código (rama propia) con herramientas para leer, editar y pasar tests. Nunca toca la app en
-                  marcha: sus cambios te llegan como propuesta y tú decides si se aplican (se validan, se fusionan y Orden se reinicia). Mejor
-                  con Opus o Sonnet.
-                </span>
-              </label>
-            )}
+            <label className={`admin-opt ${admin ? "on" : ""}`}>
+              <span className="row">
+                <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} />
+                <strong>Rol admin: puede programar mejoras de Orden</strong>
+              </span>
+              <span className="hint">
+                Trabaja en una copia aparte del código (rama propia) con herramientas para leer, editar y pasar tests. Nunca toca la app en
+                marcha: sus cambios te llegan como propuesta y tú decides si se aplican (se validan, se fusionan y Orden se reinicia). Mejor
+                con Opus o Sonnet.
+              </span>
+            </label>
             <details className="custom-personality" open={Boolean(description || voice)}>
               <summary>Carácter a medida (opcional)</summary>
               <label>

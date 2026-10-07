@@ -181,7 +181,7 @@ export function setAgentLocation(id: string, roomId: string | null): Agent {
 export function deleteAgent(id: string) {
   const agent = getAgent(id);
   if (!agent) return;
-  if (agent.isChief) throw new Error("Zen es el jefe del equipo y no se puede borrar.");
+  if (agent.isChief) throw new Error(`${agent.name} es el jefe del equipo y no se puede borrar.`);
   getDb().prepare("DELETE FROM agents WHERE id = ?").run(id);
   emit("agent.deleted", { id });
 }
