@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { upperShift } from "../../living/house";
 
 export interface Migration {
   version: number;
@@ -525,6 +526,29 @@ export const migrations: Migration[] = [
           at,
         );
       }
+    },
+  },
+  {
+    version: 16,
+    name: "planta de marketing arriba",
+    up: (db) => {
+      // La planta de marketing (se sube en ascensor) pasa a verse ENCIMA de la
+      // casa: se traslada entera (misma distribución, mismas puertas y muros).
+      const rows = db.prepare("SELECT id, x, y, w, d, building FROM rooms WHERE archived_at IS NULL").all() as {
+        id: string;
+        x: number;
+        y: number;
+        w: number;
+        d: number;
+        building: string | null;
+      }[];
+      const group = rows.filter((r) => r.building === "marketing");
+      const others = rows.filter((r) => r.building !== "marketing");
+      if (!group.length || !others.length) return;
+      const shift = upperShift(group, others);
+      if (!shift.x && !shift.y) return;
+      const move = db.prepare("UPDATE rooms SET x = ?, y = ? WHERE id = ?");
+      for (const r of group) move.run(r.x + shift.x, r.y + shift.y, r.id);
     },
   },
 ];

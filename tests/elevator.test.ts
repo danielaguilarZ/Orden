@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { openDb, setDbForTests } from "@/lib/db";
 import { ensureSeed } from "@/lib/seed";
 import { hireAgent } from "@/lib/team";
-import { assignOwnRoom, buildRoom, describeRooms, placeFurnitureAt } from "@/lib/rooms";
+import { assignOwnRoom, buildRoom, describeRooms } from "@/lib/rooms";
 import { getAgent, listAgents } from "@/lib/repo/agents";
 import { getRoom, listRooms } from "@/lib/repo/rooms";
 import { decorate } from "@/living/decorator";
 import { entranceTiles, footprint, FURNITURE } from "@/living/furniture";
-import { buildNavGrid, computeElevators, computeWalkways, elevatorStop, findPath } from "@/living/house";
+import { BUILDING_GAP, buildNavGrid, computeElevators, computeWalkways, elevatorStop, findPath, nextRoomPosition, roomFits, upperShift } from "@/living/house";
 import { BUILDINGS, ROOM_TEMPLATES } from "@/lib/roomTemplates";
 import type { FurnitureItem, Room } from "@/lib/types";
 
@@ -63,6 +63,34 @@ describe("ascensor entre plantas (puro)", () => {
   });
 });
 
+describe("planta de arriba (pura)", () => {
+  const house = [room("a", 0, "orden"), { ...room("b", 0, "orden"), x: 10 }];
+  const bottom = (rs: { x: number; y: number; w: number; d: number }[]) => Math.max(...rs.map((r) => r.x + r.w + r.y + r.d));
+  const top = (rs: { x: number; y: number }[]) => Math.min(...rs.map((r) => r.x + r.y));
+
+  it("traslada el grupo encima de la casa, centrado y sin pegarse", () => {
+    const group = [0, 10, 20].flatMap((x) => [0, 10].map((y) => ({ x: 30 + x, y, w: 10, d: 10 })));
+    const s = upperShift(group, house);
+    const moved = group.map((r) => ({ ...r, x: r.x + s.x, y: r.y + s.y }));
+    expect(bottom(moved)).toBeLessThanOrEqual(top(house) - BUILDING_GAP);
+    expect(roomFits(house, { ...moved[0], building: "marketing" })).toBe(true);
+    // Centrado en horizontal (x−y) con la casa, a una baldosa como mucho.
+    const center = (rs: typeof moved) => (Math.min(...rs.map((r) => r.x)) + Math.max(...rs.map((r) => r.x + r.w))) / 2 - (Math.min(...rs.map((r) => r.y)) + Math.max(...rs.map((r) => r.y + r.d))) / 2;
+    expect(Math.abs(center(moved) - center(house))).toBeLessThanOrEqual(1);
+  });
+
+  it("una planta de arriba nace encima y crece alejándose de la casa", () => {
+    const first = nextRoomPosition(house, "marketing", { above: true });
+    expect(first.x + first.y + 20).toBeLessThanOrEqual(top(house) - BUILDING_GAP);
+    const lobby = { ...room("m", 0, "marketing"), ...first };
+    const second = nextRoomPosition([...house, lobby], "marketing", { above: true });
+    expect(second.x + second.y).toBeLessThan(first.x + first.y);
+    expect(Math.abs(second.x - first.x) + Math.abs(second.y - first.y)).toBe(10);
+    // Sin la opción, un edificio sigue naciendo a la derecha.
+    expect(nextRoomPosition(house, "otro").x).toBe(20 + BUILDING_GAP);
+  });
+});
+
 describe("planta de marketing", () => {
   beforeEach(() => {
     setDbForTests(openDb(":memory:"));
@@ -93,12 +121,16 @@ describe("planta de marketing", () => {
     const office = buildRoom({ name: "Despacho de redes", domain: "despacho de redes sociales", building: "marketing" });
     expect(office.kind).toBe("despacho_marketing");
     expect(Math.abs(office.x - lobby.x) + Math.abs(office.y - lobby.y)).toBe(10);
-    // Sin ascensor en la casa sigue la pasarela; con él, se sube en ascensor.
-    expect(computeWalkways(listRooms())).toHaveLength(1);
-    const home = listRooms().find((r) => r.building !== "marketing")!;
-    placeFurnitureAt(home.id, "ascensor", { x: 1, y: 0 });
+    // Se ve encima de la casa: toda la planta queda por detrás en la diagonal.
+    const homeTop = Math.min(...listRooms().filter((r) => r.building !== "marketing").map((r) => r.x + r.y));
+    for (const r of [lobby, office]) expect(r.x + r.w + r.y + r.d).toBeLessThanOrEqual(homeTop - BUILDING_GAP);
+    // La casa recibe su ascensor sola: sin pasarela, se sube en ascensor.
+    const home = listRooms().filter((r) => r.building !== "marketing");
+    expect(home.flatMap((r) => r.furniture).filter((f) => f.kind === "ascensor")).toHaveLength(1);
     expect(computeWalkways(listRooms())).toEqual([]);
     expect(computeElevators(listRooms())).toHaveLength(1);
+    const g = buildNavGrid(listRooms());
+    expect(findPath(g, { x: home[0].x + 5, y: home[0].y + 8 }, { x: office.x + 5, y: office.y + 8 })?.some((p) => p.elevator)).toBe(true);
     expect(describeRooms(listRooms(), listAgents(), listAgents()[0])).toMatch(/se sube en ascensor/);
   });
 

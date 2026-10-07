@@ -40,15 +40,68 @@ export function slotOrder(count: number): Point[] {
   return out;
 }
 
+// ───────────── Plantas de arriba ─────────────
+// En la vista isométrica, «arriba» en pantalla es la diagonal hacia x e y
+// negativos. Una planta de arriba (p. ej. la de marketing, a la que se sube en
+// ascensor) se coloca ahí, centrada en horizontal sobre el resto, y crece
+// alejándose (hacia arriba). Así se ve encima sin cambiar cómo se dibuja.
+
+/** ¿Choca este grupo de salas (ya movido) con otras, dejando el hueco entre edificios? */
+function clashes(group: Area[], others: Area[]): boolean {
+  return group.some((g) => others.some((o) => overlaps(g, o, BUILDING_GAP)));
+}
+
+/**
+ * Desplazamiento que deja un grupo de salas encima (en pantalla) de las demás:
+ * su sala más baja (la de mayor x+y) justo por encima de la más alta de las
+ * otras, centrado en horizontal (x−y) y sin pegarse a ellas.
+ */
+export function upperShift(group: Area[], others: Area[]): Point {
+  if (!group.length || !others.length) return { x: 0, y: 0 };
+  const corner = { x: Math.max(...group.map((r) => r.x + r.w)), y: Math.max(...group.map((r) => r.y + r.d)) };
+  const minX = Math.min(...group.map((r) => r.x));
+  const minY = Math.min(...group.map((r) => r.y));
+  const groupDiff = (minX + corner.x) / 2 - (minY + corner.y) / 2;
+  const ox0 = Math.min(...others.map((r) => r.x));
+  const ox1 = Math.max(...others.map((r) => r.x + r.w));
+  const oy0 = Math.min(...others.map((r) => r.y));
+  const oy1 = Math.max(...others.map((r) => r.y + r.d));
+  const diff = Math.round((ox0 + ox1) / 2 - (oy0 + oy1) / 2 - groupDiff);
+  // Esquina de abajo del grupo: x+y = la más alta de las otras menos el hueco.
+  const sum = Math.min(...others.map((r) => r.x + r.y)) - BUILDING_GAP - (corner.x + corner.y);
+  let dx = Math.floor((sum + diff) / 2);
+  let dy = sum - dx;
+  const moved = () => group.map((r) => ({ x: r.x + dx, y: r.y + dy, w: r.w, d: r.d }));
+  for (let k = 0; k < 400 && clashes(moved(), others); k++) {
+    dx -= 1;
+    dy -= 1;
+  }
+  return { x: dx, y: dy };
+}
+
 /**
  * Primera posición libre para una sala nueva (en baldosas) dentro de su
  * edificio. Cada edificio crece en cuadrado desde su esquina; uno nuevo
  * empieza a la derecha de todo lo construido, dejando `BUILDING_GAP` de hueco.
  * Nunca se pega a otro edificio: entre ellos siempre queda ese hueco.
+ * Con `above`, el edificio es una planta de arriba (ver `upperShift`).
  */
-export function nextRoomPosition(rooms: (Area & Pick<Room, "building">)[], building = DEFAULT_BUILDING): Point {
+export function nextRoomPosition(rooms: (Area & Pick<Room, "building">)[], building = DEFAULT_BUILDING, opts: { above?: boolean } = {}): Point {
   const mine = rooms.filter((r) => buildingOf(r) === building);
   const others = rooms.filter((r) => buildingOf(r) !== building);
+  if (opts.above && others.length) {
+    // Crece desde la sala más cercana a las de abajo, alejándose de ellas.
+    const origin = mine.length
+      ? { x: Math.max(...mine.map((r) => r.x)), y: Math.max(...mine.map((r) => r.y)) }
+      : upperShift([{ x: 0, y: 0, w: ROOM_SIZE, d: ROOM_SIZE }], others);
+    for (const slot of slotOrder(400)) {
+      const cand = { x: origin.x - slot.x * ROOM_SIZE, y: origin.y - slot.y * ROOM_SIZE, w: ROOM_SIZE, d: ROOM_SIZE };
+      if (rooms.some((r) => overlaps(cand, r))) continue;
+      if (others.some((r) => overlaps(cand, r, BUILDING_GAP))) continue;
+      return { x: cand.x, y: cand.y };
+    }
+    throw new Error("La casa está llena");
+  }
   let origin: Point = { x: 0, y: 0 };
   if (mine.length) origin = { x: Math.min(...mine.map((r) => r.x)), y: Math.min(...mine.map((r) => r.y)) };
   else if (others.length) origin = { x: Math.max(...others.map((r) => r.x + r.w)) + BUILDING_GAP, y: Math.min(...others.map((r) => r.y)) };

@@ -4,7 +4,7 @@ import { getAgent, listAgents, setAgentLocation, updateAgent } from "./repo/agen
 import { tx } from "./db";
 import { applyTemplateTints, BUILDINGS, DESK_ROOMS, pickRoomTemplate, ROOM_TEMPLATES, type RoomTemplate } from "./roomTemplates";
 import { decorate, DESK_SETS as DESK_SETS_KINDS, removeKinds, type DecorResult } from "../living/decorator";
-import { buildingOf, DEFAULT_BUILDING, nextRoomPosition, ROOM_SIZE, roomFits, roomsConnected } from "../living/house";
+import { buildingOf, DEFAULT_BUILDING, ELEVATOR_KIND, nextRoomPosition, ROOM_SIZE, roomFits, roomsConnected } from "../living/house";
 import { checkRoomRemoval, joinNames } from "../living/roomRemoval";
 import { assertLayout, moveItem, placeNew, removeItem, roomContext as contextFor, topsOf } from "../living/roomEditor";
 import { coherenceWarnings, explainRejection, findItemRef, itemName, nearestValid, shortIds, spotsNear, type Spot } from "../living/roomMap";
@@ -12,6 +12,9 @@ import { FURNITURE } from "../living/furniture";
 import { currentRoom, deskSeats, freeDeskSeat, furnitureSummary, roomOwnerLabel, roomRelation } from "../living/presence";
 import { applyFinish, describeFinishes, findFloorFinish, findWallFinish, FLOOR_FINISHES, WALL_FINISHES, type FloorFinish, type WallFinish } from "../living/finishes";
 import type { Agent, FurnitureItem, Room, RoomStyle } from "./types";
+
+/** Planta de arriba (se sube en ascensor): se coloca y se ve encima de la casa. */
+export const isUpperFloor = (building: string) => Boolean(BUILDINGS[building]?.ascensor);
 
 /**
  * Lista de salas para el contexto de un agente: todas, con su dueño de
@@ -63,7 +66,7 @@ export function buildRoom(input: {
   const building = input.building ?? input.template?.building ?? DEFAULT_BUILDING;
   const tpl = input.template && (input.template.building ?? DEFAULT_BUILDING) === building ? input.template : pickRoomTemplate(input.domain, building);
   const rooms = listRooms();
-  const pos = nextRoomPosition(rooms, building);
+  const pos = nextRoomPosition(rooms, building, { above: isUpperFloor(building) });
   const id = input.id ?? randomUUID();
   const draft: Room = {
     id,
@@ -80,12 +83,29 @@ export function buildRoom(input: {
     createdAt: "",
     updatedAt: "",
   };
-  if (input.empty) return createRoom(draft);
+  if (input.empty) {
+    const blank = createRoom(draft);
+    ensureBaseElevator(building);
+    return blank;
+  }
   const fixed = (input.fixed || !tpl.kinds) && tpl.furniture;
   const furniture = fixed
     ? fixed.map((f) => ({ ...f, id: randomUUID() }))
     : decorate([], tpl.kinds ?? [], contextFor(draft, [...rooms, draft])).furniture;
-  return createRoom({ ...draft, furniture: applyTemplateTints(furniture, tpl) });
+  const room = createRoom({ ...draft, furniture: applyTemplateTints(furniture, tpl) });
+  ensureBaseElevator(building);
+  return room;
+}
+
+/**
+ * A una planta de arriba se sube en ascensor: si la casa de Orden aún no tiene
+ * ninguno, se le pone uno (en la primera sala donde quepa).
+ */
+function ensureBaseElevator(building: string) {
+  if (!isUpperFloor(building)) return;
+  const base = listRooms().filter((r) => buildingOf(r) === DEFAULT_BUILDING);
+  if (base.some((r) => r.furniture.some((f) => f.kind === ELEVATOR_KIND))) return;
+  for (const r of base) if (redecorateRoom(r.id, { add: [ELEVATOR_KIND] }).placed.length) return;
 }
 
 /** Nombre libre a partir de una base: «Sala nueva», «Sala nueva 2»… (sin distinguir mayúsculas). */
@@ -397,7 +417,7 @@ export function restoreRoom(roomId: string): Room {
     const rooms = listRooms();
     const siblings = rooms.filter((r) => buildingOf(r) === buildingOf(room));
     const fits = roomFits(rooms, room) && (!siblings.length || roomsConnected([...siblings, room]));
-    const pos = fits ? { x: room.x, y: room.y } : nextRoomPosition(rooms, buildingOf(room));
+    const pos = fits ? { x: room.x, y: room.y } : nextRoomPosition(rooms, buildingOf(room), { above: isUpperFloor(buildingOf(room)) });
     return unarchiveRoom(room.id, pos);
   });
 }
