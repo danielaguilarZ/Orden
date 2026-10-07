@@ -1,5 +1,6 @@
 /**
- * Edición manual de una sala: colocar, mover, girar y quitar muebles a mano.
+ * Edición manual de una sala: colocar, mover, girar, duplicar y quitar muebles
+ * a mano (la usa el modo «decorar» del living, ver decorMode.ts).
  *
  * Lógica pura (sin React ni Pixi) para poder testearla. Reglas:
  * - los muebles de suelo no se salen de la sala, no se solapan entre sí y no
@@ -136,25 +137,6 @@ function withZ(others: FurnitureItem[], item: FurnitureItem): FurnitureItem {
   return { ...item, z: s?.z ?? item.z };
 }
 
-/**
- * Traduce la casilla bajo el puntero al anclaje del mueble. La rejilla del
- * editor tiene una fila extra arriba (y = -1, muro norte) y una columna extra a
- * la izquierda (x = -1, muro oeste).
- */
-export function dropTarget(kind: string, cx: number, cy: number, flip = false): { x: number; y: number; flip: boolean } | null {
-  const def = FURNITURE[kind];
-  if (!def) return null;
-  if (def.wall) {
-    if (cy === -1 && cx >= 0) return { x: cx, y: 0, flip: false };
-    if (cx === -1 && cy >= 0) return { x: 0, y: cy, flip: true };
-    if (cy === 0 && cx >= 0 && !(cx === 0 && flip)) return { x: cx, y: 0, flip: false };
-    if (cx === 0 && cy >= 0) return { x: 0, y: cy, flip: true };
-    return null;
-  }
-  if (cx < 0 || cy < 0) return null;
-  return { x: cx, y: cy, flip };
-}
-
 /** Añade un mueble nuevo en una posición concreta. */
 export function placeNew(items: FurnitureItem[], kind: string, x: number, y: number, flip: boolean, ctx: EditContext, tint?: Record<string, string>): EditResult {
   const item = withZ(items, { id: newFurnitureId(), kind, x, y, ...(flip && { flip: true }), ...(tint && { tint }), manual: true });
@@ -196,6 +178,45 @@ export function rotateItem(items: FurnitureItem[], id: string, ctx: EditContext)
     return moveItem(items, id, cur.flip ? along : 0, cur.flip ? 0 : along, ctx, !cur.flip);
   }
   return moveItem(items, id, cur.x, cur.y, ctx, !cur.flip);
+}
+
+/**
+ * Coloca un mueble nuevo en el hueco válido más cercano a `near` (misma
+ * orientación primero; si no cabe, girado). Los adornos de pared buscan por
+ * los dos muros. Sirve para «duplicar» y para soltar desde el inventario con un clic.
+ */
+export function placeNear(
+  items: FurnitureItem[],
+  kind: string,
+  near: { x: number; y: number },
+  flip: boolean,
+  ctx: EditContext,
+  tint?: Record<string, string>,
+): EditResult {
+  const def = FURNITURE[kind];
+  if (!def) return { furniture: items, error: `No conozco el mueble «${kind}».` };
+  const cands: { x: number; y: number; flip: boolean; cost: number }[] = [];
+  const cost = (x: number, y: number, f: boolean) => Math.abs(x - near.x) + Math.abs(y - near.y) + (f !== flip ? 0.5 : 0);
+  if (def.wall) {
+    for (let i = 0; i < ctx.w; i++) cands.push({ x: i, y: 0, flip: false, cost: cost(i, 0, false) });
+    for (let j = 0; j < ctx.d; j++) cands.push({ x: 0, y: j, flip: true, cost: cost(0, j, true) });
+  } else {
+    for (let y = 0; y < ctx.d; y++)
+      for (let x = 0; x < ctx.w; x++) for (const f of [flip, !flip]) cands.push({ x, y, flip: f, cost: cost(x, y, f) });
+  }
+  cands.sort((a, b) => a.cost - b.cost || a.y - b.y || a.x - b.x);
+  for (const c of cands) {
+    const r = placeNew(items, kind, c.x, c.y, c.flip, ctx, tint);
+    if (!r.error) return r;
+  }
+  return { furniture: items, error: `No queda sitio para ${def.label.toLowerCase()}.` };
+}
+
+/** Duplica un mueble (mismo tipo, giro y colores) en el hueco libre más cercano. */
+export function duplicateItem(items: FurnitureItem[], id: string, ctx: EditContext): EditResult {
+  const cur = items.find((it) => it.id === id);
+  if (!cur) return { furniture: items, error: "Ese mueble ya no está." };
+  return placeNear(items, cur.kind, cur, Boolean(cur.flip), ctx, cur.tint);
 }
 
 /** Quita un mueble (y lo que tenga encima, que si no quedaría flotando). */

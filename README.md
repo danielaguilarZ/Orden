@@ -74,7 +74,22 @@ Ejemplos de encargos para Zen:
 - «Cada día laborable a las 8:00 prepárame un resumen del día.»
 
 Cada agente nuevo recibe un escritorio en una «Oficina compartida» que se abre sola. Las salas por ámbito
-(cocina, biblioteca, gimnasio, viajes…) se crean a demanda y se amueblan solas; también se pueden editar a mano.
+(cocina, biblioteca, gimnasio, viajes…) se crean a demanda y se amueblan solas; también se pueden decorar a mano.
+
+### Modo decorar
+
+Botón **«Decorar»** del living (o «Decorar a mano» en la ficha de un agente), al estilo Habbo y en la propia sala:
+
+- La cámara encuadra la sala y se superpone su rejilla (los pasos de puerta, en ámbar).
+- Un mueble se coge pulsándolo y se arrastra: la sombra va **verde si cabe y roja si no** (sin solapes, sin
+  salirse, sin tapar puertas, adornos solo en muro alto, objetos pequeños encima de una mesa).
+- Sobre el mueble elegido sale una barra pequeña: **girar** (R), **duplicar** (Ctrl+D) y **quitar** (Supr).
+- A la derecha, un **inventario plegable**: «Muebles» (buscar y arrastrar a la sala; un clic lo pone en un hueco
+  libre), «Suelo y paredes» y «Sala» (nombre, recolocar automáticamente, borrar, papelera y «+» para crear otra).
+- Arriba: Deshacer (Ctrl+Z), Descartar, Guardar y Salir. Nada se guarda hasta «Guardar».
+
+Lógica pura en `src/living/decorMode.ts` y `src/living/roomEditor.ts`; la escena (`scene.ts`) pinta rejilla,
+sombra y selección, y la interfaz es `src/components/DecorMode.tsx`.
 
 ## Configuración (`.env`, opcional)
 
