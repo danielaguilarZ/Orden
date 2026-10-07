@@ -6,6 +6,8 @@ import type { Agent, Conversation, Message, Task } from "@/lib/types";
 import { Markdown } from "./Markdown";
 import { AvatarPreview } from "./AvatarPreview";
 import { CodeChangeCard } from "./CodeChangeCard";
+import { AttachButton, AttachmentTray, DropZone, MessageAttachments, useAttachments } from "./Attachments";
+import type { AttachmentRef } from "@/lib/files/attachments";
 
 interface ChatData {
   conversation: Conversation;
@@ -26,6 +28,7 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
+  const files = useAttachments();
   const agents = useStore((s) => s.agents);
   const worker = useStore((s) => s.worker);
   const convId = data?.conversation.id;
@@ -72,14 +75,17 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
     if (el) el.scrollTop = el.scrollHeight;
   }, [data?.messages.length, stream?.text, data?.tasks.length]);
 
+  const canSend = (text.trim().length > 0 || files.ids.length > 0) && !files.uploading && !sending;
+
   async function send() {
     const value = text.trim();
-    if (!value || sending) return;
+    if (!canSend) return;
     setSending(true);
     setError("");
     try {
-      await api(`/api/agents/${agent.id}/chat`, { method: "POST", json: { text: value } });
+      await api(`/api/agents/${agent.id}/chat`, { method: "POST", json: { text: value, attachments: files.ids } });
       setText("");
+      files.clear();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -100,7 +106,7 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
   const queuedWhileStopped = !worker?.alive && data?.tasks.some((t) => t.status === "queued");
 
   return (
-    <div className="chat">
+    <DropZone className="chat" onFiles={files.add} label={`Suelta para enviárselo a ${agent.name}`}>
       <div className="chat-list" ref={listRef}>
         {!data && <p className="muted center">Cargando…</p>}
         {data && data.messages.length === 0 && (
@@ -158,7 +164,8 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
             return (
               <div key={m.id} className="msg msg-user">
                 <div className="msg-body">
-                  <Markdown text={m.content} />
+                  {m.content && <Markdown text={m.content} />}
+                  <MessageAttachments refs={(m.data.attachments as AttachmentRef[]) ?? []} />
                 </div>
               </div>
             );
@@ -220,9 +227,11 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
           send();
         }}
       >
+        <AttachmentTray items={files.items} onRemove={files.remove} />
         <textarea
           value={text}
           autoFocus={autoFocus}
+          onPaste={files.onPaste}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -230,19 +239,21 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
               send();
             }
           }}
-          placeholder={agent.paused ? `${agent.name} está en pausa: los encargos esperarán.` : `Escribe a ${agent.name}…`}
+          placeholder={agent.paused ? `${agent.name} está en pausa: los encargos esperarán.` : `Escribe a ${agent.name}… (arrastra o pega capturas y archivos)`}
           rows={2}
         />
         <div className="chat-actions">
           <button type="button" className="btn ghost small" onClick={reset} title="Nueva conversación">
             Nueva conversación
           </button>
-          <button className="btn primary" disabled={!text.trim() || sending}>
+          <AttachButton onFiles={files.add} />
+          <span style={{ flex: 1 }} />
+          <button className="btn primary" disabled={!canSend}>
             Enviar
           </button>
         </div>
         {error && <p className="bad-text small">{error}</p>}
       </form>
-    </div>
+    </DropZone>
   );
 }

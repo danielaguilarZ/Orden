@@ -7,6 +7,7 @@ import { currentRoom } from "@/living/presence";
 import { skyAt, skyCssVars, type Sky } from "@/living/sky";
 import { AgentDrawer, STATUS_LABEL } from "./AgentDrawer";
 import { AgentForm } from "./AgentForm";
+import { AttachButton, AttachmentTray, DropZone, useAttachments } from "./Attachments";
 import { AvatarPreview } from "./AvatarPreview";
 import { DecorMode } from "./DecorMode";
 
@@ -59,6 +60,7 @@ export function LivingView() {
   const [ready, setReady] = useState(false);
   const [adding, setAdding] = useState(false);
   const [order, setOrder] = useState("");
+  const files = useAttachments();
   const [sending, setSending] = useState(false);
   const chief = agents.find((a) => a.isChief);
   // Plantas de la torre y la que se ve (las manda la escena).
@@ -128,12 +130,15 @@ export function LivingView() {
     [],
   );
 
+  const canOrder = Boolean(chief) && (order.trim().length > 0 || files.ids.length > 0) && !files.uploading && !sending;
+
   async function sendOrder() {
-    if (!chief || !order.trim()) return;
+    if (!chief || !canOrder) return;
     setSending(true);
     try {
-      await api(`/api/agents/${chief.id}/chat`, { method: "POST", json: { text: order.trim() } });
+      await api(`/api/agents/${chief.id}/chat`, { method: "POST", json: { text: order.trim(), attachments: files.ids } });
       setOrder("");
+      files.clear();
       setSelected(chief.id);
     } finally {
       setSending(false);
@@ -145,10 +150,13 @@ export function LivingView() {
 
   return (
     <div className="living">
-      <div
+      <DropZone
         className={`living-stage${decorating ? " decorating" : ""}`}
         data-sky={sky?.phase}
         style={sky ? (skyCssVars(sky) as React.CSSProperties) : undefined}
+        onFiles={files.add}
+        disabled={decorating || !chief}
+        label={`Suelta para enviárselo a ${chief?.name ?? "Zen"}`}
       >
         <div className="living-sky" aria-hidden>
           <div className="sky-stars" />
@@ -203,8 +211,10 @@ export function LivingView() {
             sendOrder();
           }}
         >
-          <input value={order} onChange={(e) => setOrder(e.target.value)} placeholder={`Encárgale algo a ${chief?.name ?? "Zen"}…`} />
-          <button className="btn primary" disabled={!order.trim() || sending}>
+          <AttachmentTray items={files.items} onRemove={files.remove} />
+          <input value={order} onChange={(e) => setOrder(e.target.value)} onPaste={files.onPaste} placeholder={`Encárgale algo a ${chief?.name ?? "Zen"}…`} />
+          <AttachButton onFiles={files.add} />
+          <button className="btn primary" disabled={!canOrder}>
             Encargar
           </button>
         </form>
@@ -234,7 +244,7 @@ export function LivingView() {
           <li data-status="sleeping">Durmiendo</li>
           <li data-status="error">Error</li>
         </ul>
-      </div>
+      </DropZone>
       {!roomEdit && agent && <AgentDrawer agent={agent} onClose={() => setSelected(null)} />}
       {adding && <AgentForm onClose={() => setAdding(false)} onSaved={(a) => setSelected(a.id)} />}
     </div>

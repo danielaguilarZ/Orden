@@ -434,11 +434,11 @@ export function updateFileContent(id: string, data: Uint8Array): FileNode {
 }
 
 /** Carpeta hija en uso con ese nombre; la crea si no existe. Si hay un archivo con ese nombre, error. */
-function ensureChildFolder(parentId: string | null, name: string, by: string | null): FileNode {
+export function ensureChildFolder(parentId: string | null, name: string, by: string | null, opts: { private?: boolean } = {}): FileNode {
   const t = new FileTree();
   const hit = t.children(parentId).find((n) => nameKey(n.name) === nameKey(name));
   if (hit && hit.kind !== "carpeta") throw new Error(`«${t.pathOf(hit)}» es un archivo, no una carpeta.`);
-  return hit ?? createFolder({ parentId, name, by });
+  return hit ?? createFolder({ parentId, name, by, ...(opts.private !== undefined && { private: opts.private }) });
 }
 
 /**

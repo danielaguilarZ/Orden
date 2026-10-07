@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, onEvent } from "@/client/store";
+import { AttachButton, AttachmentTray, DropZone, MessageAttachments, useAttachments } from "./Attachments";
 import {
   answerParts,
   answerTone,
@@ -27,7 +28,7 @@ const POSTPONE: { days: number; label: string }[] = [
 
 const date = (iso: string) => new Date(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 
-type Act = (d: Decision, accion: DecisionAction, extra?: { respuesta?: string; opcion?: string; dias?: number }) => Promise<void>;
+type Act = (d: Decision, accion: DecisionAction, extra?: { respuesta?: string; opcion?: string; dias?: number; adjuntos?: string[] }) => Promise<void>;
 
 /**
  * Pestaña «Decisiones»: solo lo que el usuario tiene que decidir. Cada
@@ -128,6 +129,7 @@ export function DecisionsPage() {
 
 function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; onAct: Act }) {
   const [text, setText] = useState("");
+  const files = useAttachments();
   const [choice, setChoice] = useState("");
   const [later, setLater] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -136,7 +138,9 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
   const run = async (accion: DecisionAction, extra: { respuesta?: string; opcion?: string; dias?: number } = {}) => {
     setBusy(true);
     try {
-      await onAct(d, accion, extra);
+      // Los adjuntos van con la respuesta (no al aplazar).
+      await onAct(d, accion, accion === "aplazar" ? extra : { ...extra, adjuntos: files.ids });
+      files.clear();
     } catch {
       // El error ya se muestra arriba.
     } finally {
@@ -145,7 +149,7 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
     }
   };
   const respuesta = text.trim() || undefined;
-  const canAnswer = Boolean(respuesta || choice);
+  const canAnswer = Boolean(respuesta || choice || files.ids.length) && !files.uploading;
   const submit = () => {
     if (busy) return;
     if (d.approval) run("aceptar", { respuesta });
@@ -157,7 +161,7 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
   const postponedUntil = d.postponedUntil && mounted && new Date(d.postponedUntil) > new Date() ? d.postponedUntil : null;
 
   return (
-    <article className="dec-card">
+    <DropZone className="dec-card" onFiles={files.add} label={`Suelta para enviárselo a ${d.authorName || "quien pregunta"}`}>
       <header className="dec-head">
         <h2>{d.title}</h2>
         <div className="dec-meta">
@@ -201,12 +205,14 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
           ))}
         </div>
       )}
+      <AttachmentTray items={files.items} onRemove={files.remove} />
       <textarea
         className="dec-answer"
+        onPaste={files.onPaste}
         rows={2}
         value={text}
         maxLength={MAX_ANSWER_LENGTH}
-        placeholder={placeholder}
+        placeholder={`${placeholder} Puedes arrastrar o pegar capturas y archivos.`}
         aria-label="Tu respuesta"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -233,13 +239,14 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
             </button>
           </span>
         )}
+        <AttachButton onFiles={files.add} disabled={busy} />
         <span style={{ flex: 1 }} />
         {d.approval ? (
           <>
-            <button className="btn small danger" disabled={busy} onClick={() => run("rechazar", { respuesta })}>
+            <button className="btn small danger" disabled={busy || files.uploading} onClick={() => run("rechazar", { respuesta })}>
               Rechazar
             </button>
-            <button className="btn small primary" disabled={busy} onClick={() => run("aceptar", { respuesta })}>
+            <button className="btn small primary" disabled={busy || files.uploading} onClick={() => run("aceptar", { respuesta })}>
               Aceptar
             </button>
           </>
@@ -249,7 +256,7 @@ function DecisionCard({ d, mounted, onAct }: { d: Decision; mounted: boolean; on
           </button>
         )}
       </footer>
-    </article>
+    </DropZone>
   );
 }
 
@@ -260,6 +267,7 @@ function ResolvedRow({ d, mounted, onAct }: { d: Decision; mounted: boolean; onA
     <li className={`dec-row ans-${d.answerKind ?? "none"}`}>
       <div className="dec-row-main">
         <strong>{d.title}</strong>
+        <MessageAttachments refs={d.attachments ?? []} />
         <span className="dec-row-meta">
           <Chip tone={answerTone(d.answerKind)}>{state}</Chip>
           {detail && (

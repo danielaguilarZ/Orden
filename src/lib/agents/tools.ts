@@ -26,7 +26,8 @@ export interface ToolContext {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ToolDef = SdkMcpToolDefinition<any>;
 
-type ToolResult = { content: { type: "text"; text: string }[]; isError?: boolean };
+/** Texto y, si hace falta, imágenes (p. ej. una captura leída de Archivos). */
+type ToolResult = { content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[]; isError?: boolean };
 
 /** Igual que `tool` del SDK, pero con un tipo común para poder agruparlas. */
 export function defineTool<S extends z.ZodRawShape>(

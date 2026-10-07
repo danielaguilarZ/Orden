@@ -132,7 +132,7 @@ function fileTools(ctx: { agent: Agent; note: (text: string, data?: Record<strin
     ),
     defineTool(
       "archivo_leer",
-      "Lee el contenido de un archivo: texto de un PDF (por páginas), filas de un CSV o de las hojas de un XLSX (columnas separadas por « | ») o texto plano. Los textos largos van por trozos: usa «desde» para seguir.",
+      "Lee el contenido de un archivo: texto de un PDF (por páginas), filas de un CSV o de las hojas de un XLSX (columnas separadas por « | ») o texto plano. Las imágenes (capturas, fotos) te llegan como imagen para que las veas. Los textos largos van por trozos: usa «desde» para seguir.",
       {
         archivo: z.string().describe("Ruta (p. ej. «Finanzas/Nóminas/nomina-2026-09.pdf») o id"),
         desde: z.number().int().min(0).optional().describe("Carácter desde el que seguir leyendo"),
@@ -145,6 +145,11 @@ function fileTools(ctx: { agent: Agent; note: (text: string, data?: Record<strin
             ctx.note(`Ha leído «${r.path}»`, { kind: "file", fileId: r.node.id });
             logActivity("archivos", `${agent.name} ha leído «${r.path}»`, agent.id, { fileId: r.node.id });
           }
+          // Las imágenes no tienen texto: se le devuelve la propia imagen para que la vea.
+          const mime = r.node.mime.split(";")[0];
+          if (VISIBLE_IMAGES.includes(mime) && r.node.size <= MAX_IMAGE_BYTES) {
+            return { content: [{ type: "text" as const, text: `«${r.path}» · imagen · ${formatBytes(r.node.size)}` }, { type: "image" as const, data: readFileData(r.node.id).toString("base64"), mimeType: mime }] };
+          }
           return ok(r.text);
         } catch (err) {
           return fail((err as Error).message);
@@ -155,6 +160,9 @@ function fileTools(ctx: { agent: Agent; note: (text: string, data?: Record<strin
 }
 
 const MAX_WRITE = 200_000;
+/** Imágenes que el modelo puede ver (y su tamaño máximo en la API de Claude). */
+const VISIBLE_IMAGES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 /** Carpeta de un agente dentro de «Daily» (su nombre; si no vale como nombre de carpeta, su id corto). */
 export function agentDailyFolder(agent: Pick<Agent, "id" | "name">): string {
@@ -226,5 +234,5 @@ registerPromptSection((agent) => {
       ? `Tu acceso de lectura: ${access === "todo" ? "todo, incluidas las carpetas privadas (finanzas y personales)" : "solo las carpetas compartidas; las privadas no las ves"}. Usa archivos_listar o archivos_buscar para encontrarlos y archivo_leer para leerlos (extrae el texto de los PDF y las filas de CSV/XLSX).`
       : "No tienes acceso de lectura a ninguna carpeta."
   }
-- Son datos personales: usa solo lo necesario y no copies números de cuenta, DNI o similares completos a archivos o a la memoria.`;
+${canRead ? "- Lo que el usuario adjunta en un chat o en una decisión queda en la carpeta compartida «Adjuntos» (por fecha): cualquiera del equipo puede leerlo con archivo_leer. Si delegas algo que depende de un adjunto, pasa su ruta.\n" : ""}- Son datos personales: usa solo lo necesario y no copies números de cuenta, DNI o similares completos a archivos o a la memoria.`;
 });

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { getDb, now, tx } from "../db";
+import { getDb, now, parseJson, tx } from "../db";
+import type { AttachmentRef } from "../files/attachments";
 import { emit } from "../events";
 import { getAgent, getChief } from "../repo/agents";
 import { activeConversation, addMessage } from "../repo/chat";
@@ -41,6 +42,7 @@ interface Row {
   postponed_until: string | null;
   task_id: string | null;
   source: string | null;
+  attachments: string;
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
@@ -70,6 +72,7 @@ function toDecision(r: Row): Decision {
     postponedUntil: r.postponed_until,
     taskId: r.task_id,
     source: r.source,
+    attachments: parseJson(r.attachments ?? "[]", []),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     resolvedAt: r.resolved_at,
@@ -235,6 +238,8 @@ export interface UserAnswer {
   text?: string;
   /** Opción sugerida elegida. */
   option?: string;
+  /** Capturas o archivos que adjunta al responder. */
+  attachments?: AttachmentRef[];
 }
 
 /** Normaliza la respuesta: qué tipo es y qué texto se guarda. */
@@ -248,6 +253,7 @@ export function normalizeAnswer(d: Decision, a: UserAnswer): { kind: AnswerKind;
     if (!d.options.includes(option)) throw new Error("Esa opción no está entre las sugeridas.");
     return { kind: "opcion", answer: text ? `${option} — ${text}` : option };
   }
+  if (!text && a.attachments?.length) return { kind: "texto", answer: "(Respuesta en los adjuntos)" };
   if (!text) throw new Error("Escribe una respuesta o elige una opción.");
   return { kind: "texto", answer: text };
 }
@@ -260,7 +266,7 @@ export function answerDecision(id: string, a: UserAnswer, opts: { at?: Date } = 
   const { kind, answer } = normalizeAnswer(d, a);
   const at = (opts.at ?? new Date()).toISOString();
   tx(() => {
-    setFields(id, { status: "resuelta", answer_kind: kind, answer, resolved_at: at, postponed_until: null, task_id: null });
+    setFields(id, { status: "resuelta", answer_kind: kind, answer, resolved_at: at, postponed_until: null, task_id: null, attachments: JSON.stringify(a.attachments ?? []) });
     logActivity("decisiones", `Decisión resuelta: «${d.title}» · ${kind === "opcion" || kind === "texto" ? answer : kind}`, null, { decisionId: id });
   });
   dispatchAnswered();
@@ -284,7 +290,7 @@ export function reopenDecision(id: string): Decision {
   const d = getDecision(id);
   if (!d) throw new Error("Esa decisión no existe.");
   if (d.status !== "resuelta") throw new Error("Solo se puede reabrir una decisión resuelta.");
-  setFields(id, { status: "pendiente", answer_kind: null, answer: null, resolved_at: null, postponed_until: null, task_id: null });
+  setFields(id, { status: "pendiente", answer_kind: null, answer: null, resolved_at: null, postponed_until: null, task_id: null, attachments: "[]" });
   logActivity("decisiones", `Decisión reabierta: «${d.title}»`, null, { decisionId: id });
   return changed(getDecision(id)!);
 }
@@ -361,14 +367,14 @@ export function dispatchAnswered(): Decision[] {
         title: `Decisión respondida: ${d.title}`,
         prompt: answerPrompt(d),
         createdBy: "user",
-        data: { decisionId: d.id },
+        data: { decisionId: d.id, ...(d.attachments.length && { attachments: d.attachments }) },
       });
       addMessage({
         conversationId: conv.id,
         role: "user",
         content: `**Decisión «${d.title}»:** ${verdictOf(d)}`,
         taskId: task.id,
-        data: { kind: "decision", decisionId: d.id },
+        data: { kind: "decision", decisionId: d.id, ...(d.attachments.length && { attachments: d.attachments }) },
       });
       setFields(d.id, { task_id: task.id });
       out.push(getDecision(d.id)!);

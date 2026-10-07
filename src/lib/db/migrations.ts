@@ -645,4 +645,12 @@ export const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 19,
+    name: "adjuntos en decisiones",
+    up: (db) => {
+      // Lo que el usuario adjunta al responder una decisión (capturas, PDF…): JSON de AttachmentRef.
+      db.exec("ALTER TABLE decisions ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'");
+    },
+  },
 ];

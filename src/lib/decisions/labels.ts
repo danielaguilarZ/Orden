@@ -1,3 +1,4 @@
+import type { AttachmentRef } from "../files/attachments";
 /**
  * Tipos y etiquetas de Decisiones, sin dependencias de servidor (los usa
  * también la interfaz).
@@ -41,6 +42,8 @@ export interface Decision {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /** Lo que adjuntó el usuario al responder (quedan en Archivos/Adjuntos). */
+  attachments: AttachmentRef[];
 }
 
 /** Lo que hace el usuario desde la pestaña. */

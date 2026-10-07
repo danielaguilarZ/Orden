@@ -1,5 +1,6 @@
 import { route, body, type IdCtx } from "@/lib/http";
 import { answerDecision, DECISION_ACTIONS, postponeDecision, reopenDecision, type DecisionAction } from "@/lib/decisions/repo";
+import { resolveAttachments } from "@/lib/files/attachments";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +11,10 @@ export const dynamic = "force-dynamic";
  */
 export const POST = route<IdCtx>(async (req, { params }) => {
   const { id } = await params;
-  const b = await body<{ accion?: string; respuesta?: string; opcion?: string; dias?: number }>(req);
+  const b = await body<{ accion?: string; respuesta?: string; opcion?: string; dias?: number; adjuntos?: string[] }>(req);
   const action = b.accion as DecisionAction;
   if (!DECISION_ACTIONS.includes(action)) throw new Error("Acción desconocida.");
   if (action === "aplazar") return postponeDecision(id, Number(b.dias ?? 7));
   if (action === "reabrir") return reopenDecision(id);
-  return answerDecision(id, { action, text: b.respuesta, option: b.opcion });
+  return answerDecision(id, { action, text: b.respuesta, option: b.opcion, attachments: resolveAttachments(b.adjuntos) });
 });

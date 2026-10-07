@@ -28,6 +28,12 @@ export const FILE_TYPES: Record<string, FileType> = {
   webp: { mime: "image/webp", category: "imagen", inline: true },
   txt: { mime: "text/plain; charset=utf-8", category: "texto", inline: false },
   md: { mime: "text/markdown; charset=utf-8", category: "texto", inline: false },
+  // Más texto que suele llegar al chat (el XML se sirve como texto plano). HTML y SVG no, a propósito.
+  json: { mime: "application/json; charset=utf-8", category: "texto", inline: false },
+  xml: { mime: "text/plain; charset=utf-8", category: "texto", inline: false },
+  yml: { mime: "text/plain; charset=utf-8", category: "texto", inline: false },
+  yaml: { mime: "text/plain; charset=utf-8", category: "texto", inline: false },
+  log: { mime: "text/plain; charset=utf-8", category: "texto", inline: false },
 };
 
 export const ALLOWED_EXTENSIONS = Object.keys(FILE_TYPES);

@@ -1,6 +1,8 @@
 import path from "node:path";
 import fs from "node:fs";
-import { createSdkMcpServer, query as sdkQuery, type Options, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { createSdkMcpServer, query as sdkQuery, type Options, type SDKMessage, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import { attachmentContent, type AttachmentRef } from "../files/attachments";
+import { getNode } from "../files/repo";
 import { claudeBinaryPath, claudeEnv } from "../claude/binary";
 import { getAgent, setAgentStatus, updateAgent } from "../repo/agents";
 import { addMessage, getConversation, listMessages, setConversationSession } from "../repo/chat";
@@ -29,6 +31,25 @@ const MODEL_IDS: Record<string, string> = { haiku: "haiku", sonnet: "sonnet", op
 function taskModel(agent: Agent, task: Task): ModelChoice {
   const m = task.data.model;
   return m === "haiku" || m === "sonnet" || m === "opus" ? m : agent.model;
+}
+
+/**
+ * Mensaje para el modelo. Con adjuntos (capturas, PDF…) va como mensaje con
+ * bloques: el texto, la lista de adjuntos y las imágenes y PDF dentro, para
+ * que el agente los vea sin tener que buscarlos en Archivos.
+ */
+function promptFor(text: string, task: Task): string | AsyncIterable<SDKUserMessage> {
+  const refs = (Array.isArray(task.data.attachments) ? (task.data.attachments as AttachmentRef[]) : []).filter((r) => getNode(r.id));
+  if (!refs.length) return text;
+  const { note, blocks } = attachmentContent(refs);
+  const message: SDKUserMessage = {
+    type: "user",
+    parent_tool_use_id: null,
+    message: { role: "user", content: [{ type: "text", text: `${text}\n\n${note}` }, ...blocks] },
+  };
+  return (async function* () {
+    yield message;
+  })();
 }
 
 /** Tipo de entrada en Actividad según el origen del encargo. */
@@ -156,7 +177,7 @@ export async function runTask(task: Task, opts: RunOptions = {}): Promise<Task> 
 
   const attempt = async (resumeId: string | undefined) => {
     const q = queryFn({
-      prompt: buildUserMessage(agent, task, recapFor(resumeId)),
+      prompt: promptFor(buildUserMessage(agent, task, recapFor(resumeId)), task),
       options: {
         ...baseOptions({ ...agent, model: taskModel(agent, task) }, abort),
         ...devOptions,
