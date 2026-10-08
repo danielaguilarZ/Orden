@@ -54,7 +54,7 @@ También: `servicio:estado`, `servicio:parar`, `servicio:arrancar` y `servicio:q
 
 | Servicio | Qué permite | Credencial |
 | --- | --- | --- |
-| GitHub | Leer y comentar; con permiso completo, ramas, commits y PRs (nunca fusiona). | `gh` del PC o token fine-grained cifrado |
+| GitHub | Leer y comentar; con permiso completo, ramas, commits y PRs (nunca fusiona). Un repo concreto o **todos los de tu cuenta**. | Botón «Iniciar sesión con GitHub» (token cifrado), `gh` del PC o token cifrado |
 | Google Calendar | Leer la agenda y volcarla a un panel. Solo lectura. | OAuth en el navegador (calendar.readonly) |
 | Tiempo (clima) | Tiempo actual y previsión hasta 7 días (Open-Meteo). Solo lectura. | Ninguna |
 | Noticias (RSS) | Titulares de las fuentes RSS/Atom que elijas (máx. 15). Solo lectura. | Ninguna |
@@ -101,6 +101,7 @@ sombra y selección, y la interfaz es `src/components/DecorMode.tsx`.
 | `ORDEN_MAX_CONCURRENCY` | `3` | Encargos simultáneos del worker |
 | `ORDEN_TZ` | `Europe/Madrid` | Zona horaria que ven los agentes |
 | `ORDEN_SECRET_KEY` | (se crea `data/secreto.key`) | Clave para cifrar los tokens de Conexiones |
+| `ORDEN_GITHUB_CLIENT_ID` | (vacío) | Client ID de una OAuth App de GitHub con «Enable Device Flow» para el botón «Iniciar sesión con GitHub» (si no, la propia pestaña Conexiones lo pide una vez) |
 | `ORDEN_FILES_DIR` | `data/archivos` | Carpeta de los archivos subidos |
 | `ORDEN_FILES_MAX_MB` | `25` | Tamaño máximo por archivo |
 
