@@ -7,6 +7,7 @@ import { UPCOMING_SERVICES } from "@/lib/connections/catalog";
 import { categoryLabel, connectionSections, connectionStatus, grantCount, serviceCategory, serviceMonogram, type CatalogItem, type ConnView, type StatusTone } from "@/lib/connections/view";
 import type { AuthMode, GrantLevel } from "@/lib/repo/connections";
 import { Backdrop } from "./Backdrop";
+import { GithubLogin } from "./GithubLogin";
 import { SearchBox } from "./ui/kit";
 
 type Accion = "probar" | "autorizar" | "desconectar";
@@ -339,7 +340,7 @@ function ConnectionModal({ conn, service, onClose, onChange }: { conn: ConnView;
       {(service?.supportsSecret || oauth || conn.service === "github") && (
         <div className="conn-modal-section">
           <h3>Acceso</h3>
-          <Credentials conn={conn} service={service} busy={busy} patch={patch} action={action} />
+          <Credentials conn={conn} service={service} busy={busy} patch={patch} action={action} onChange={onChange} />
         </div>
       )}
 
@@ -409,12 +410,14 @@ function Credentials({
   busy,
   patch,
   action,
+  onChange,
 }: {
   conn: ConnView;
   service?: ServiceInfo;
   busy: string;
   patch: (b: Record<string, unknown>) => Promise<void>;
   action: (a: Accion) => Promise<void>;
+  onChange: () => void;
 }) {
   const [token, setToken] = useState("");
   const [client, setClient] = useState({ clientId: "", clientSecret: "" });
@@ -422,6 +425,7 @@ function Credentials({
 
   return (
     <>
+      {conn.service === "github" && conn.config.repo === "*" && <GithubLogin onDone={() => onChange()} />}
       {!oauth && conn.service === "github" && (
         <label className="conn-field">
           <span>Cómo entra</span>
@@ -587,7 +591,13 @@ function AddModal({ service, onClose, onAdded }: { service: ServiceInfo; onClose
       }
     >
       <p className="muted small conn-desc">{service.description}</p>
-      <Steps steps={service.steps} open />
+      {service.key === "github" && (
+        <>
+          <GithubLogin onDone={(id) => onAdded(id)} />
+          <p className="muted small">O conecta un solo repositorio (con el GitHub CLI o un token):</p>
+        </>
+      )}
+      <Steps steps={service.steps} open={service.key !== "github"} />
       <form
         id="conn-add-form"
         onSubmit={(e) => {
