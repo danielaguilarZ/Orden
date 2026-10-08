@@ -1,0 +1,111 @@
+/* Adjuntos del chat: arrastrar, pegar y mostrar archivos e imágenes. */
+
+/* Adjuntos de la barra de encargos: en su propia fila encima del campo */
+.command-bar {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.command-bar .attach-pending,
+.command-bar .command-error {
+  flex: 0 0 100%;
+  margin: 0;
+}
+.command-bar input:not([type="file"]) {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat {
+  position: relative;
+}
+
+/* Soltar archivos sobre el chat */
+.chat-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius);
+  background: rgba(21, 20, 29, 0.88);
+  color: var(--accent-2);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.attach-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.attach-list:last-child {
+  margin-bottom: 0;
+}
+.attach-thumb {
+  display: block;
+  max-width: 220px;
+  max-height: 160px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.attach-chip {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.attach-chip:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.attach-pending {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.attach-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 4px 3px 8px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-size: 12px;
+}
+.attach-item img {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.attach-item.error {
+  color: var(--bad);
+}
+.attach-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attach-x {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.attach-x:hover {
+  color: var(--text, #fff);
+}
+.chat-actions-left {
+  display: flex;
+  gap: 6px;
+}

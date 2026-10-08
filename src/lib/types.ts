@@ -168,6 +168,14 @@ export interface Conversation {
 
 export type MessageRole = "user" | "agent" | "tool" | "system";
 
+/** Archivo adjunto a un mensaje del chat (vive en Archivos, carpeta «Adjuntos»). */
+export interface AttachmentRef {
+  id: string;
+  name: string;
+  mime: string;
+  size: number;
+}
+
 export interface Message {
   id: string;
   conversationId: string;

@@ -6,6 +6,7 @@ import type { Agent, Conversation, Message, Task } from "@/lib/types";
 import { Markdown } from "./Markdown";
 import { AvatarPreview } from "./AvatarPreview";
 import { CodeChangeCard } from "./CodeChangeCard";
+import { ACCEPT, AttachmentList, attachmentsOf, onPasteFiles, PendingList, useAttachments, useFileDrop } from "./Attachments";
 
 interface ChatData {
   conversation: Conversation;
@@ -25,6 +26,9 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const att = useAttachments();
+  const { dragging, dropProps } = useFileDrop(att.attach);
+  const fileInput = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const agents = useStore((s) => s.agents);
   const worker = useStore((s) => s.worker);
@@ -38,7 +42,9 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
   useEffect(() => {
     setData(null);
     setStream(null);
+    att.clear();
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   useEffect(
@@ -72,14 +78,21 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
     if (el) el.scrollTop = el.scrollHeight;
   }, [data?.messages.length, stream?.text, data?.tasks.length]);
 
+  const canSend = (text.trim() !== "" || att.ready.length > 0) && !sending && !att.uploading;
+
   async function send() {
     const value = text.trim();
-    if (!value || sending) return;
+    if (!canSend) return;
     setSending(true);
     setError("");
+    att.setError("");
     try {
-      await api(`/api/agents/${agent.id}/chat`, { method: "POST", json: { text: value } });
+      await api(`/api/agents/${agent.id}/chat`, {
+        method: "POST",
+        json: { text: value, ...(att.ready.length && { attachments: att.ready.map((f) => f.id) }) },
+      });
       setText("");
+      att.clear();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -100,7 +113,8 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
   const queuedWhileStopped = !worker?.alive && data?.tasks.some((t) => t.status === "queued");
 
   return (
-    <div className="chat">
+    <div className={`chat ${dragging ? "dragging" : ""}`} {...dropProps}>
+      {dragging && <div className="chat-drop">Suelta aquí para adjuntar a {agent.name}</div>}
       <div className="chat-list" ref={listRef}>
         {!data && <p className="muted center">Cargando…</p>}
         {data && data.messages.length === 0 && (
@@ -155,10 +169,12 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
                   </div>
                 </div>
               );
+            const files = attachmentsOf(m);
             return (
               <div key={m.id} className="msg msg-user">
                 <div className="msg-body">
-                  <Markdown text={m.content} />
+                  {files.length > 0 && <AttachmentList items={files} />}
+                  {m.content && <Markdown text={m.content} />}
                 </div>
               </div>
             );
@@ -220,6 +236,7 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
           send();
         }}
       >
+        <PendingList pending={att.pending} onRemove={att.remove} />
         <textarea
           value={text}
           autoFocus={autoFocus}
@@ -230,18 +247,35 @@ export function AgentChat({ agent, autoFocus }: { agent: Agent; autoFocus?: bool
               send();
             }
           }}
-          placeholder={agent.paused ? `${agent.name} está en pausa: los encargos esperarán.` : `Escribe a ${agent.name}…`}
+          onPaste={(e) => onPasteFiles(e, att.attach)}
+          placeholder={agent.paused ? `${agent.name} está en pausa: los encargos esperarán.` : `Escribe a ${agent.name}… (arrastra o pega archivos e imágenes)`}
           rows={2}
         />
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          hidden
+          accept={ACCEPT}
+          onChange={(e) => {
+            att.attach([...(e.target.files ?? [])]);
+            e.target.value = "";
+          }}
+        />
         <div className="chat-actions">
-          <button type="button" className="btn ghost small" onClick={reset} title="Nueva conversación">
-            Nueva conversación
-          </button>
-          <button className="btn primary" disabled={!text.trim() || sending}>
-            Enviar
+          <span className="chat-actions-left">
+            <button type="button" className="btn ghost small" onClick={() => fileInput.current?.click()} title="Adjuntar archivos o imágenes">
+              📎 Adjuntar
+            </button>
+            <button type="button" className="btn ghost small" onClick={reset} title="Nueva conversación">
+              Nueva conversación
+            </button>
+          </span>
+          <button className="btn primary" disabled={!canSend}>
+            {att.uploading ? "Subiendo…" : "Enviar"}
           </button>
         </div>
-        {error && <p className="bad-text small">{error}</p>}
+        {(error || att.error) && <p className="bad-text small">{error || att.error}</p>}
       </form>
     </div>
   );
