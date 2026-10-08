@@ -30,6 +30,15 @@ export class GitHubError extends Error {
 
 const TIMEOUT_MS = 60_000;
 
+/**
+ * Valor de `config.repo` de una conexión de cuenta: todos los repos que ve la
+ * credencial (la del inicio de sesión con GitHub o un token clásico).
+ */
+export const ALL_REPOS = "*";
+
+/** ¿Lo escrito en «Repositorio» significa «todos»? («*», «todos», «todos los repositorios»…). */
+export const isAllRepos = (value: unknown) => /^(\*|todos?|all)(\s+(los\s+)?(repos|repositorios))?$/i.test(String(value ?? "").trim());
+
 // ── Validación (todo lo que viene de un agente pasa por aquí) ─────────────
 
 /** «owner/repo» con los caracteres que admite GitHub. */
@@ -332,7 +341,33 @@ export class RepoApi {
   }
 }
 
+/** Preguntas sobre la cuenta (no sobre un repo): quién es y qué repos tiene. Solo lectura. */
+export class AccountApi {
+  constructor(private transport: Transport) {}
+
+  me() {
+    return this.transport({ method: "GET", path: "/user" }) as Promise<{ login: string }>;
+  }
+  repos(limit = 50) {
+    return this.transport({
+      method: "GET",
+      path: `/user/repos${query({ per_page: Math.max(1, Math.min(limit, 100)), sort: "pushed", affiliation: "owner,collaborator,organization_member" })}`,
+    }) as Promise<AccountRepo[]>;
+  }
+}
+
 // ── Tipos mínimos de la API ───────────────────────────────────────────────
+
+export interface AccountRepo {
+  full_name: string;
+  private: boolean;
+  fork?: boolean;
+  archived?: boolean;
+  default_branch: string;
+  description: string | null;
+  pushed_at: string | null;
+  permissions?: { admin?: boolean; push?: boolean; pull?: boolean };
+}
 
 export interface RepoInfo {
   full_name: string;
