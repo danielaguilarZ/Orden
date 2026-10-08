@@ -12,6 +12,7 @@ import { ADMIN_ALLOWED, ADMIN_TOOLS, isAdminTask } from "../dev/admin";
 import { captureChanges, ensureWorkspace } from "../dev/workspace";
 import { createHash } from "node:crypto";
 import { buildTools } from "./tools";
+import { loadAttachments, promptWithAttachments } from "../chat/attachments";
 import type { Agent, Task, TaskUsage } from "../types";
 
 /**
@@ -143,9 +144,12 @@ export async function runTask(task: Task, opts: RunOptions = {}): Promise<Task> 
   const admin = isAdminTask(agent, task.kind);
   let devOptions: Partial<Options> = {};
 
+  // Adjuntos del chat: su texto va en el mensaje y las imágenes como imágenes reales.
+  const attachments = task.kind === "chat" ? loadAttachments(task.data.attachments) : null;
+
   const attempt = async (resumeId: string | undefined) => {
     const q = queryFn({
-      prompt: buildUserMessage(agent, task, recapFor(resumeId)),
+      prompt: promptWithAttachments(buildUserMessage(agent, task, recapFor(resumeId)), attachments),
       options: {
         ...baseOptions(agent, abort),
         ...devOptions,
