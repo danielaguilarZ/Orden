@@ -9,6 +9,7 @@ import { AgentDrawer, STATUS_LABEL } from "./AgentDrawer";
 import { AgentForm } from "./AgentForm";
 import { AvatarPreview } from "./AvatarPreview";
 import { DecorMode } from "./DecorMode";
+import { ACCEPT, onPasteFiles, PendingList, useAttachments, useFileDrop } from "./Attachments";
 
 /** Living isométrico. PixiJS solo se carga en el navegador. */
 export function LivingView() {
@@ -24,6 +25,9 @@ export function LivingView() {
   const [adding, setAdding] = useState(false);
   const [order, setOrder] = useState("");
   const [sending, setSending] = useState(false);
+  const att = useAttachments();
+  const { dragging, dropProps } = useFileDrop(att.attach);
+  const fileInput = useRef<HTMLInputElement>(null);
   const chief = agents.find((a) => a.isChief);
   // El cielo solo se calcula en el navegador (hora local) y se refresca cada minuto.
   const [sky, setSky] = useState<Sky | null>(null);
@@ -89,13 +93,22 @@ export function LivingView() {
     [],
   );
 
+  const canOrder = Boolean(chief) && (order.trim() !== "" || att.ready.length > 0) && !sending && !att.uploading;
+
   async function sendOrder() {
-    if (!chief || !order.trim()) return;
+    if (!chief || !canOrder) return;
     setSending(true);
+    att.setError("");
     try {
-      await api(`/api/agents/${chief.id}/chat`, { method: "POST", json: { text: order.trim() } });
+      await api(`/api/agents/${chief.id}/chat`, {
+        method: "POST",
+        json: { text: order.trim(), ...(att.ready.length && { attachments: att.ready.map((f) => f.id) }) },
+      });
       setOrder("");
+      att.clear();
       setSelected(chief.id);
+    } catch (err) {
+      att.setError((err as Error).message);
     } finally {
       setSending(false);
     }
@@ -110,7 +123,9 @@ export function LivingView() {
         className={`living-stage${decorating ? " decorating" : ""}`}
         data-sky={sky?.phase}
         style={sky ? (skyCssVars(sky) as React.CSSProperties) : undefined}
+        {...(decorating ? {} : dropProps)}
       >
+        {dragging && <div className="chat-drop">Suelta aquí para adjuntar a {chief?.name ?? "Zen"}</div>}
         <div className="living-sky" aria-hidden>
           <div className="sky-stars" />
           <div className="sky-glow" />
@@ -155,10 +170,31 @@ export function LivingView() {
             sendOrder();
           }}
         >
-          <input value={order} onChange={(e) => setOrder(e.target.value)} placeholder={`Encárgale algo a ${chief?.name ?? "Zen"}…`} />
-          <button className="btn primary" disabled={!order.trim() || sending}>
-            Encargar
+          <PendingList pending={att.pending} onRemove={att.remove} />
+          <button type="button" className="btn ghost" onClick={() => fileInput.current?.click()} title="Adjuntar archivos o imágenes (también puedes arrastrarlos o pegarlos)">
+            📎
           </button>
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            hidden
+            accept={ACCEPT}
+            onChange={(e) => {
+              att.attach([...(e.target.files ?? [])]);
+              e.target.value = "";
+            }}
+          />
+          <input
+            value={order}
+            onChange={(e) => setOrder(e.target.value)}
+            onPaste={(e) => onPasteFiles(e, att.attach)}
+            placeholder={`Encárgale algo a ${chief?.name ?? "Zen"}…`}
+          />
+          <button className="btn primary" disabled={!canOrder}>
+            {att.uploading ? "Subiendo…" : "Encargar"}
+          </button>
+          {att.error && <p className="bad-text small command-error">{att.error}</p>}
         </form>
 
         <div className="living-hud">
