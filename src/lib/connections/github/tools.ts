@@ -3,7 +3,7 @@ import { defineTool, fail, ok, type ToolContext, type ToolDef } from "../../agen
 import { logActivity } from "../../repo/system";
 import { redact } from "../../secrets";
 import type { AgentGrant } from "../registry";
-import { RepoApi, resolveTransport, safeBranch, safePath, safeSha, type ContentItem, type IssueItem } from "./api";
+import { AccountApi, ALL_REPOS, parseRepo, RepoApi, resolveTransport, safeBranch, safePath, safeSha, type ContentItem, type IssueItem } from "./api";
 import { fetchSnapshot, statusMarkdown } from "./status";
 
 /**
@@ -29,19 +29,35 @@ export const signature = (agentName: string) => `\n\n---\n_Escrito por ${agentNa
 
 export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
   if (!grants.length) return [];
-  const repos = grants.map((g) => String(g.connection.config.repo));
-  const fullRepos = grants.filter((g) => g.level === "completo").map((g) => String(g.connection.config.repo));
-  const multi = repos.length > 1;
+  /** Conexión de cuenta («todos los repos»): el agente indica el repo en cada llamada. */
+  const isAll = (g: AgentGrant) => g.connection.config.repo === ALL_REPOS;
+  const named = (list: AgentGrant[]) => list.filter((g) => !isAll(g)).map((g) => String(g.connection.config.repo));
+  const fullGrants = grants.filter((g) => g.level === "completo");
+  const multi = grants.length > 1;
+  const hasAll = grants.some(isAll);
 
-  /** Parámetro «repo» solo si tiene varios; siempre limitado a los suyos. */
-  const repoShape = (list: string[]): Record<string, z.ZodType> =>
-    multi && list.length ? { repo: z.enum(list as [string, ...string[]]).describe("Repo (solo los que tienes conectados)") } : {};
+  /**
+   * Parámetro «repo»: obligatorio si hay una conexión de cuenta (cualquier
+   * «propietario/nombre» que vea la credencial); si no, solo cuando hay varios
+   * repos conectados y limitado a los suyos.
+   */
+  const repoShape = (list: AgentGrant[]): Record<string, z.ZodType> => {
+    const names = named(list);
+    if (list.some(isAll)) {
+      return { repo: z.string().describe(`Repo «propietario/nombre»${names.length ? ` (conectados aparte: ${names.join(", ")})` : ""}. Puedes usar cualquier repo de la cuenta; lista los tuyos con github_repos`) };
+    }
+    return multi && names.length ? { repo: z.enum(names as [string, ...string[]]).describe("Repo (solo los que tienes conectados)") } : {};
+  };
 
-  const pick = (repo: unknown, needFull: boolean): AgentGrant => {
-    const list = needFull ? grants.filter((g) => g.level === "completo") : grants;
-    const g = repo ? list.find((x) => x.connection.config.repo === repo) : list[0];
+  /** Conexión y repo (completo, «propietario/nombre») de una llamada. */
+  const pick = (repo: unknown, needFull: boolean): { g: AgentGrant; full: string } => {
+    const list = needFull ? fullGrants : grants;
+    const wanted = repo ? parseRepo(repo).full : "";
+    const exact = wanted ? list.find((x) => !isAll(x) && String(x.connection.config.repo).toLowerCase() === wanted.toLowerCase()) : undefined;
+    const g = exact ?? (wanted ? list.find(isAll) : list.find((x) => !isAll(x)) ?? list[0]);
     if (!g) throw new Error(needFull ? "No tienes permiso de escritura en ese repo." : "No tienes acceso a ese repo.");
-    return g;
+    if (isAll(g) && !wanted) throw new Error("Indica el repo («propietario/nombre»). Lista los tuyos con github_repos.");
+    return { g, full: isAll(g) ? wanted : String(g.connection.config.repo) };
   };
 
   /** Envuelve cada herramienta: elige conexión, abre el cliente y limpia errores. */
@@ -49,9 +65,9 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
     <A,>(needFull: boolean, fn: (api: RepoApi, args: A, g: AgentGrant) => Promise<string>) =>
     async (args: A) => {
       try {
-        const g = pick((args as { repo?: string }).repo, needFull);
+        const { g, full } = pick((args as { repo?: string }).repo, needFull);
         const { transport } = await resolveTransport(g.connection);
-        return ok(clip(await fn(new RepoApi(String(g.connection.config.repo), transport), args, g)));
+        return ok(clip(await fn(new RepoApi(full, transport), args, g)));
       } catch (err) {
         return fail(`GitHub: ${redact((err as Error).message)}`);
       }
@@ -69,14 +85,14 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
     defineTool(
       "github_resumen",
       "Resumen del repo de GitHub: rama principal, PRs e issues abiertos y últimos commits.",
-      { ...repoShape(repos) },
+      { ...repoShape(grants) },
       run(false, async (api, _a, g) => `${statusMarkdown(await fetchSnapshot(api), new Date())}\n\nTu permiso: ${g.level}.`),
     ),
     defineTool(
       "github_archivos",
       "Lista los archivos de una carpeta del repo (o todo el árbol con recursivo).",
       {
-        ...repoShape(repos),
+        ...repoShape(grants),
         ruta: z.string().optional().describe("Carpeta relativa al repo; vacío = raíz"),
         rama: z.string().optional().describe("Rama, etiqueta o SHA; por defecto la principal"),
         recursivo: z.boolean().optional().describe("Todo el árbol (máx. 400 rutas)"),
@@ -104,7 +120,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
       "github_leer",
       "Lee un archivo del repo. Para archivos largos, pide un rango de líneas.",
       {
-        ...repoShape(repos),
+        ...repoShape(grants),
         ruta: z.string().describe("Ruta del archivo relativa al repo"),
         rama: z.string().optional(),
         desde: z.number().int().min(1).optional().describe("Primera línea"),
@@ -127,7 +143,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
     defineTool(
       "github_buscar",
       "Busca texto en el código del repo (búsqueda de GitHub; solo la rama principal).",
-      { ...repoShape(repos), texto: z.string().min(2) },
+      { ...repoShape(grants), texto: z.string().min(2) },
       run(false, async (api, a: { texto: string }) => {
         const r = await api.searchCode(a.texto);
         if (!r.items.length) return "Sin resultados.";
@@ -138,7 +154,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
       "github_commits",
       "Últimos commits (de una rama o de un archivo) o el detalle de uno con su diff si pasas sha.",
       {
-        ...repoShape(repos),
+        ...repoShape(grants),
         rama: z.string().optional(),
         ruta: z.string().optional().describe("Solo commits que tocan esta ruta"),
         sha: z.string().optional().describe("Ver un commit concreto"),
@@ -166,7 +182,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
       "github_lista",
       "Lista issues o pull requests del repo.",
       {
-        ...repoShape(repos),
+        ...repoShape(grants),
         tipo: z.enum(["issues", "prs"]),
         estado: z.enum(["open", "closed", "all"]).optional().describe("Por defecto open"),
         etiquetas: z.string().optional().describe("Solo issues: etiquetas separadas por comas"),
@@ -191,7 +207,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
     defineTool(
       "github_ver",
       "Muestra un issue o pull request por número, con sus comentarios (y archivos cambiados si es un PR).",
-      { ...repoShape(repos), numero: z.number().int().min(1) },
+      { ...repoShape(grants), numero: z.number().int().min(1) },
       run(false, async (api, a: { numero: number }) => {
         const issue = await api.issue(a.numero);
         const out = [`#${issue.number} ${issue.title} [${issue.state}] — ${issue.user?.login ?? "?"} · ${issue.html_url}`];
@@ -211,7 +227,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
     defineTool(
       "github_comentar",
       "Publica un comentario en un issue o pull request (se firma como agente de Orden).",
-      { ...repoShape(repos), numero: z.number().int().min(1), texto: z.string().min(1).max(20_000) },
+      { ...repoShape(grants), numero: z.number().int().min(1), texto: z.string().min(1).max(20_000) },
       run(false, async (api, a: { numero: number; texto: string }) => {
         const c = await api.comment(a.numero, sign(a.texto));
         audit(api, `comentario en #${a.numero}`, c.html_url);
@@ -220,14 +236,45 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
     ),
   ];
 
-  if (!fullRepos.length) return read;
+  if (hasAll) {
+    read.unshift(
+      defineTool(
+        "github_repos",
+        "Lista los repositorios de la cuenta de GitHub conectada (los más recientes primero), con su visibilidad y el permiso que tiene la cuenta en cada uno.",
+        { limite: z.number().int().min(1).max(100).optional().describe("Por defecto 30") },
+        async ({ limite }: { limite?: number }) => {
+          try {
+            const g = grants.find(isAll)!;
+            const { transport } = await resolveTransport(g.connection);
+            const list = await new AccountApi(transport).repos(limite ?? 30);
+            if (!list.length) return ok("La cuenta no tiene repositorios visibles.");
+            return ok(
+              clip(
+                list
+                  .map((r) => {
+                    const perm = r.permissions ? (r.permissions.push ? "escritura" : "solo lectura") : "";
+                    const flags = [r.private ? "privado" : "público", perm, r.fork ? "fork" : "", r.archived ? "archivado" : ""].filter(Boolean).join(", ");
+                    return `${r.full_name} · ${flags} · rama ${r.default_branch}${r.pushed_at ? ` · ${day(r.pushed_at)}` : ""}${r.description ? ` — ${r.description.slice(0, 100)}` : ""}`;
+                  })
+                  .join("\n"),
+              ),
+            );
+          } catch (err) {
+            return fail(`GitHub: ${redact((err as Error).message)}`);
+          }
+        },
+      ),
+    );
+  }
+
+  if (!fullGrants.length) return read;
 
   const write: ToolDef[] = [
     defineTool(
       "github_crear_issue",
       "Crea un issue en el repo.",
       {
-        ...repoShape(fullRepos),
+        ...repoShape(fullGrants),
         titulo: z.string().min(1).max(250),
         texto: z.string().max(60_000).optional(),
         etiquetas: z.array(z.string()).max(10).optional(),
@@ -242,7 +289,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
       "github_editar_issue",
       "Cambia título, texto, etiquetas o estado (abrir/cerrar) de un issue o PR.",
       {
-        ...repoShape(fullRepos),
+        ...repoShape(fullGrants),
         numero: z.number().int().min(1),
         titulo: z.string().min(1).max(250).optional(),
         texto: z.string().max(60_000).optional(),
@@ -260,7 +307,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
     defineTool(
       "github_crear_rama",
       "Crea una rama nueva a partir de otra (por defecto, la principal).",
-      { ...repoShape(fullRepos), nombre: z.string(), desde: z.string().optional() },
+      { ...repoShape(fullGrants), nombre: z.string(), desde: z.string().optional() },
       run(true, async (api, a: { nombre: string; desde?: string }) => {
         const name = safeBranch(a.nombre);
         const from = a.desde ? safeBranch(a.desde) : await api.defaultBranch();
@@ -273,7 +320,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
       "github_commit",
       "Hace UN commit con uno o varios archivos (crear, sustituir el contenido completo o borrar) en una rama que no sea la principal.",
       {
-        ...repoShape(fullRepos),
+        ...repoShape(fullGrants),
         rama: z.string(),
         mensaje: z.string().min(1).max(2000),
         archivos: z
@@ -307,7 +354,7 @@ export function githubTools(ctx: ToolContext, grants: AgentGrant[]): ToolDef[] {
       "github_crear_pr",
       "Abre un pull request de una rama hacia otra (por defecto, la principal). No fusiona: eso lo decide el usuario.",
       {
-        ...repoShape(fullRepos),
+        ...repoShape(fullGrants),
         titulo: z.string().min(1).max(250),
         rama: z.string().describe("Rama con los cambios"),
         base: z.string().optional().describe("Rama destino; por defecto la principal"),
