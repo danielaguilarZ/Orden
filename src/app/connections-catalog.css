@@ -76,6 +76,39 @@
   align-items: center;
   margin: 6px 0;
 }
+/* Inicio de sesión con GitHub */
+.gh-login {
+  margin: 4px 0 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.gh-login-btn {
+  width: 100%;
+  padding: 10px 14px;
+  font-weight: 600;
+}
+.gh-code p {
+  margin: 6px 0;
+}
+.gh-code-value {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 6px;
+  background: var(--bg-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  user-select: all;
+}
+.gh-steps {
+  margin: 6px 0 10px;
+  padding-left: 20px;
+}
+.gh-steps li {
+  margin: 3px 0;
+}
 .conn-row.end {
   justify-content: flex-end;
 }
